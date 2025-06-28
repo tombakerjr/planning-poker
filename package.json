@@ -1,13 +1,15 @@
 {
-  "name": "nuxt-app",
+  "name": "planning-poker",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+		"dev": "nuxt dev",
+		"generate": "nuxt generate",
+		"preview": "pnpm run build && wrangler dev",
+		"postinstall": "nuxt prepare",
+		"deploy": "pnpm run build && wrangler deploy",
+		"cf-typegen": "wrangler types"
   },
   "dependencies": {
     "nuxt": "^3.17.5",
@@ -16,6 +18,9 @@
   },
   "devDependencies": {
     "@nuxtjs/tailwindcss": "7.0.0-beta.0",
+    "h3": "^1.15.3",
+    "nitro-cloudflare-dev": "^0.2.2",
+    "nitropack": "^2.11.13",
     "tailwindcss": "^4.1.11",
     "wrangler": "^4.22.0"
   }
