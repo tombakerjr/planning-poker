@@ -25,25 +25,13 @@ export default defineEventHandler(async (event) => {
     const durableObjectId = env.POKER_ROOM.idFromString(roomId);
     const durableObject = env.POKER_ROOM.get(durableObjectId);
 
-    // Create a proper Request object from the event
-    const url = getRequestURL(event);
-    const headers = new Headers();
-    
-    // Copy relevant headers
-    const eventHeaders = getHeaders(event);
-    for (const [key, value] of Object.entries(eventHeaders)) {
-      if (value) {
-        headers.set(key, value);
-      }
-    }
+    // Get the original request from the event context.
+    // This is crucial for WebSocket upgrades as it contains internal Cloudflare properties.
+    const originalRequest = event.context.cloudflare.request;
 
-    const request = new Request(url, {
-      method: event.node.req.method,
-      headers: headers,
-    });
+    // Forward the original WebSocket upgrade request to the Durable Object
+    return durableObject.fetch(originalRequest);
 
-    // Forward the WebSocket upgrade request to the Durable Object
-    return await durableObject.fetch(request);
   } catch (error: any) {
     console.error('WebSocket upgrade failed:', error);
     throw createError({
