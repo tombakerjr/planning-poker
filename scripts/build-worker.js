@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { resolve } from 'path'
 
 console.log('🔧 Building worker with Nuxt app and Durable Objects...')
 
@@ -18,8 +17,8 @@ try {
   
   // Replace the placeholder with the actual Nuxt handler import
   const workerContent = workerTemplate.replace(
-    'export default {\n  fetch: () => new Response(\'Build the Nuxt app first\', { status: 503 })\n}',
-    'export { default } from \'./.output/server/index.mjs\''
+    /\/\/ This will be replaced with the actual Nuxt handler after build\s*const nuxtHandler = \{\s*fetch: \(\) => new Response\('Build the Nuxt app first', \{ status: 503 \}\)\s*\}/,
+    'import nuxtHandler from \'./.output/server/index.mjs\''
   )
   
   // Write the final worker file
