@@ -1,4 +1,4 @@
-import { ref, onUnmounted, nextTick } from 'vue'
+import { ref, onUnmounted, nextTick, readonly } from 'vue'
 
 export interface WebSocketState {
   isConnected: boolean
@@ -36,7 +36,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}) {
     reconnectAttempts: 0,
   })
 
-  let reconnectTimer: NodeJS.Timeout | null = null
+  let reconnectTimer: number | null = null
 
   const connect = async () => {
     if (socket.value?.readyState === WebSocket.OPEN) {
@@ -102,7 +102,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}) {
 
     reconnectTimer = setTimeout(() => {
       connect()
-    }, delay)
+    }, delay) as unknown as number
   }
 
   const disconnect = () => {

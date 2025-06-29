@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nuxt build && node scripts/build-worker.js",
+    "build": "nuxt build",
     "dev": "wrangler dev --local",
     "dev:nuxt": "nuxt dev",
     "generate": "nuxt generate",
