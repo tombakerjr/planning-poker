@@ -4,14 +4,15 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-		"dev": "nuxt dev",
-		"generate": "nuxt generate",
-		"preview": "pnpm run build && wrangler dev",
-		"postinstall": "nuxt prepare",
-		"deploy": "pnpm run build && wrangler deploy",
-		"cf-typegen": "wrangler types"
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "pnpm run build && wrangler dev",
+    "postinstall": "nuxt prepare",
+    "deploy": "pnpm run build && wrangler deploy",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
+    "nanoid": "^5.1.5",
     "nuxt": "^3.17.5",
     "vue": "^3.5.17",
     "vue-router": "^4.5.1"

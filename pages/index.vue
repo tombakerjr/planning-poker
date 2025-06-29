@@ -1,22 +1,25 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
 const roomName = ref('')
 const isCreating = ref(false)
+const error = ref('')
 
 async function createRoom() {
-  if (!roomName.value.trim()) return
+  if (isCreating.value) return
   
   isCreating.value = true
+  error.value = ''
   
   try {
-    // Generate a simple room ID (in a real app, this would be handled by the backend)
-    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase()
+    // Call the room creation API
+    const response = await $fetch('/api/room/create', {
+      method: 'POST',
+    }) as { roomId: string }
     
     // Navigate to the new room
-    await navigateTo(`/room/${roomId}`)
-  } catch (error) {
-    console.error('Error creating room:', error)
+    await navigateTo(`/room/${response.roomId}`)
+  } catch (err: any) {
+    console.error('Error creating room:', err)
+    error.value = err.message || 'Failed to create room. Please try again.'
   } finally {
     isCreating.value = false
   }
@@ -59,6 +62,32 @@ function handleKeyPress(event: KeyboardEvent) {
           </h3>
           
           <div class="space-y-4">
+            <!-- Error Message -->
+            <div v-if="error" class="rounded-md bg-red-50 p-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm text-red-800">{{ error }}</p>
+                </div>
+                <div class="ml-auto pl-3">
+                  <div class="-mx-1.5 -my-1.5">
+                    <button
+                      @click="error = ''"
+                      class="inline-flex rounded-md bg-red-50 p-1.5 text-red-500 hover:bg-red-100"
+                    >
+                      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label for="roomName" class="block text-sm font-medium text-gray-700 mb-2">
                 Room Name (Optional)
