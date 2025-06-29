@@ -5,21 +5,10 @@ export default defineNuxtConfig({
 
   nitro: {
     preset: "cloudflare_module",
-    
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
     },
-
-    // Include the PokerRoom in the bundle
-    externals: {
-      inline: ["./server/lib/PokerRoom"]
-    },
-
-    // Ensure proper module loading
-    experimental: {
-      wasm: true
-    }
   },
 
   modules: ["@nuxtjs/tailwindcss"],

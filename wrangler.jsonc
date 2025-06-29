@@ -1,11 +1,7 @@
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "planning-poker",
-	"main": "./.output/server/index.mjs",
+	"main": "./worker.js",
 	"compatibility_date": "2025-06-28",
 	"assets": {
 		"binding": "ASSETS",

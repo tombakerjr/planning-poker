@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
+    "build": "nuxt build && node scripts/build-worker.js",
+    "dev": "wrangler dev --local",
+    "dev:nuxt": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "pnpm run build && wrangler dev",
     "postinstall": "nuxt prepare",
