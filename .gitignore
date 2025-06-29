@@ -6,6 +6,9 @@
 .cache
 dist
 
+# Built worker file
+worker.js
+
 # Node dependencies
 node_modules
 
