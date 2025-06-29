@@ -18,8 +18,7 @@
 		"bindings": [
 			{
 				"name": "POKER_ROOM",
-				"class_name": "PokerRoom",
-				"script_name": "planning-poker"
+				"class_name": "PokerRoom"
 			}
 		]
 	},

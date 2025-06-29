@@ -1,10 +1,9 @@
-import { PokerRoom } from './lib/PokerRoom';
+// Main entry point for Cloudflare Workers
+// This file ensures PokerRoom is properly exported for Durable Objects
 
-// Export the PokerRoom Durable Object for the Workers runtime
-export { PokerRoom };
+export { PokerRoom } from './lib/PokerRoom';
 
-// Default export for the worker
+// Default export for the worker - will be overridden by Nuxt
 export default {
-  // This will be handled by Nuxt's server routes
   fetch: () => new Response('Not Found', { status: 404 })
 };
