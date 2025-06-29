@@ -15,8 +15,11 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      // Default for development - will be overridden in production
-      websocketUrl: "ws://localhost:8787",
+      // In production, WebSocket connects to the same domain as the app
+      // In development, still use localhost:8787 for the separate worker
+      websocketUrl: process.env.NODE_ENV === 'production' 
+        ? undefined // Will use current origin
+        : "ws://localhost:8787",
     },
   },
 

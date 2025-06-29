@@ -33,7 +33,16 @@ export function usePokerRoom(roomId: string) {
 
   // WebSocket connection using @vueuse/core
   const runtimeConfig = useRuntimeConfig()
-  const websocketUrl = runtimeConfig.public.websocketUrl || 'ws://localhost:8787'
+  
+  // In production, use the same origin but with ws/wss protocol
+  // In development, use the configured websocket URL
+  const websocketUrl = runtimeConfig.public.websocketUrl || (() => {
+    if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      return `${protocol}//${window.location.host}`
+    }
+    return 'ws://localhost:8787' // Fallback for SSR
+  })()
   
   // We'll set up the WebSocket connection after joining
   let wsConnection: ReturnType<typeof useWebSocket> | null = null

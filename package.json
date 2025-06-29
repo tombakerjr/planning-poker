@@ -5,11 +5,10 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
-    "dev:websockets": "wrangler dev --config websockets/wrangler.jsonc --local --port 8787",
+    "dev:worker": "wrangler dev --local --port 8787",
     "generate": "nuxt generate",
     "preview": "pnpm run build && wrangler dev",
     "postinstall": "nuxt prepare",
-    "deploy:websockets": "wrangler deploy --config websockets/wrangler.jsonc",
     "deploy": "pnpm run build && wrangler deploy",
     "cf-typegen": "wrangler types"
   },
