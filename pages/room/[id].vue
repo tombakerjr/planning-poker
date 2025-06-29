@@ -10,7 +10,7 @@ const {
   roomState,
   currentUser,
   isJoined,
-  wsState,
+  status, // Updated from wsState to status
   connectToRoom,
   leaveRoom,
   joinRoom,
@@ -18,10 +18,10 @@ const {
 
 const showNameModal = ref(true)
 
-// Auto-connect when component mounts
-onMounted(() => {
-  connectToRoom()
-})
+// Don't auto-connect on mount - wait for user to join
+// onMounted(() => {
+//   connectToRoom()
+// })
 
 // Clean up when leaving the page
 onBeforeUnmount(() => {
@@ -37,8 +37,8 @@ const handleJoinRoom = (name: string) => {
 }
 
 // Show modal again if disconnected
-watch(wsState, (newState) => {
-  if (!newState.isConnected && !newState.isConnecting && isJoined.value) {
+watch(status, (newStatus) => {
+  if (newStatus === 'CLOSED' && isJoined.value) {
     // Connection lost, might want to show reconnection status
   }
 })
@@ -59,16 +59,16 @@ provide('pokerRoom', pokerRoom)
             <div
               class="h-2 w-2 rounded-full"
               :class="{
-                'bg-green-500': wsState.isConnected,
-                'bg-yellow-500': wsState.isConnecting,
-                'bg-red-500': !wsState.isConnected && !wsState.isConnecting
+                'bg-green-500': status === 'OPEN',
+                'bg-yellow-500': status === 'CONNECTING',
+                'bg-red-500': status === 'CLOSED'
               }"
             />
             <span class="text-sm text-gray-600">
               {{
-                wsState.isConnected
+                status === 'OPEN'
                   ? 'Connected'
-                  : wsState.isConnecting
+                  : status === 'CONNECTING'
                   ? 'Connecting...'
                   : 'Disconnected'
               }}
@@ -80,7 +80,7 @@ provide('pokerRoom', pokerRoom)
 
     <main class="flex-grow p-4 sm:p-6 lg:p-8">
       <!-- Loading/Connection State -->
-      <div v-if="!wsState.isConnected && wsState.isConnecting" class="mx-auto max-w-screen-xl">
+      <div v-if="status === 'CONNECTING'" class="mx-auto max-w-screen-xl">
         <div class="text-center py-12">
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p class="text-gray-600">Connecting to room...</p>
@@ -89,7 +89,7 @@ provide('pokerRoom', pokerRoom)
 
       <!-- Main Content -->
       <div
-        v-else-if="wsState.isConnected"
+        v-else-if="status === 'OPEN'"
         class="mx-auto grid max-w-screen-xl grid-cols-1 items-start gap-8 lg:grid-cols-3"
       >
         <!-- Main voting area -->
@@ -112,7 +112,7 @@ provide('pokerRoom', pokerRoom)
             </svg>
           </div>
           <h2 class="text-xl font-semibold text-gray-900 mb-2">Connection Failed</h2>
-          <p class="text-gray-600 mb-4">{{ wsState.error || 'Unable to connect to the room' }}</p>
+          <p class="text-gray-600 mb-4">Unable to connect to the room</p>
           <button
             @click="connectToRoom"
             class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -132,7 +132,7 @@ provide('pokerRoom', pokerRoom)
 
     <!-- User Name Modal -->
     <UserNameModal
-      :show="showNameModal && wsState.isConnected"
+      :show="showNameModal && !isJoined"
       @join="handleJoinRoom"
       @close="showNameModal = false"
     />

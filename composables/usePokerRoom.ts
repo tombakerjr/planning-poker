@@ -1,5 +1,5 @@
-import { ref, computed } from 'vue'
-import { useWebSocket } from './useWebSocket'
+import { ref, computed, readonly } from 'vue'
+import { useWebSocket } from '@vueuse/core'
 
 export interface Participant {
   id: string
@@ -28,35 +28,18 @@ export function usePokerRoom(roomId: string) {
   const currentUser = ref<{ id: string; name: string } | null>(null)
   const isJoined = ref(false)
 
-  // WebSocket connection
-  const wsUrl = computed(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    return `${protocol}//${window.location.host}/api/room/${roomId}/ws`
-  })
+  // Generate a unique user ID for this session
+  const userId = `user-${Math.random().toString(36).substring(2, 9)}`
 
-  const { connect, disconnect, send, state: wsState } = useWebSocket(wsUrl.value, {
-    onMessage: handleMessage,
-    onOpen: () => {
-      console.log('Connected to room:', roomId)
-    },
-    onClose: () => {
-      console.log('Disconnected from room:', roomId)
-      isJoined.value = false
-    },
-    onError: (error) => {
-      console.error('WebSocket error:', error)
-    },
-  })
+  // WebSocket connection using @vueuse/core
+  const runtimeConfig = useRuntimeConfig()
+  const websocketUrl = runtimeConfig.public.websocketUrl || 'ws://localhost:8787'
+  
+  // We'll set up the WebSocket connection after joining
+  let wsConnection: ReturnType<typeof useWebSocket> | null = null
 
   function handleMessage(message: RoomMessage) {
     switch (message.type) {
-      case 'connected':
-        // Store the session ID provided by the server
-        if (message.payload?.sessionId && currentUser.value) {
-          currentUser.value.id = message.payload.sessionId
-        }
-        break
-
       case 'update':
         if (message.payload) {
           roomState.value = {
@@ -80,7 +63,7 @@ export function usePokerRoom(roomId: string) {
   const myVote = computed(() => {
     if (!currentUser.value) return null
     const participant = roomState.value.participants.find(
-      p => p.id === currentUser.value?.id
+      p => p.id === userId // Use our generated userId instead of currentUser.id
     )
     return participant?.vote || null
   })
@@ -104,6 +87,9 @@ export function usePokerRoom(roomId: string) {
     return Math.round((sum / numericVotes.length) * 10) / 10
   })
 
+  // Connection status
+  const status = ref<'CLOSED' | 'CONNECTING' | 'OPEN'>('CLOSED')
+
   // Actions
   const joinRoom = (name: string) => {
     if (!name.trim()) {
@@ -111,66 +97,106 @@ export function usePokerRoom(roomId: string) {
       return false
     }
 
-    // Set up the current user (ID will be set when server responds with sessionId)
+    // Set up the current user
     currentUser.value = {
-      id: '', // Will be set by the server response
+      id: userId,
       name: name.trim()
     }
 
-    const success = send({
-      type: 'join',
-      payload: { name: name.trim() }
+    // Create protocol header for authentication (room:userId encoded in base64url)
+    const auth = `${roomId}:${userId}`
+    const protocol = btoa(auth).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+
+    // Set up WebSocket connection
+    wsConnection = useWebSocket(websocketUrl, {
+      protocols: [protocol, 'poker'],
+      onConnected: () => {
+        console.log('Connected to poker room:', roomId)
+        status.value = 'OPEN'
+        // Send join message
+        wsConnection?.send(JSON.stringify({
+          type: 'join',
+          name: name.trim()
+        }))
+        isJoined.value = true
+      },
+      onDisconnected: () => {
+        console.log('Disconnected from poker room:', roomId)
+        status.value = 'CLOSED'
+        isJoined.value = false
+      },
+      onError: (ws, error) => {
+        console.error('WebSocket error:', error)
+        status.value = 'CLOSED'
+      },
+      onMessage: (ws, event) => {
+        try {
+          const data = JSON.parse(event.data)
+          handleMessage(data)
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error)
+        }
+      },
     })
 
-    if (success) {
-      isJoined.value = true
-    }
-
-    return success
+    // Open the connection
+    status.value = 'CONNECTING'
+    wsConnection.open()
+    
+    return true
   }
 
   const vote = (voteValue: string | number | null) => {
-    if (!isJoined.value) {
+    if (!isJoined.value || !wsConnection) {
       console.error('Must join room before voting')
       return false
     }
 
-    return send({
+    wsConnection.send(JSON.stringify({
       type: 'vote',
-      payload: { vote: voteValue }
-    })
+      vote: voteValue
+    }))
+    return true
   }
 
   const revealVotes = () => {
-    if (!isJoined.value) {
+    if (!isJoined.value || !wsConnection) {
       console.error('Must join room before revealing votes')
       return false
     }
 
-    return send({
+    wsConnection.send(JSON.stringify({
       type: 'reveal'
-    })
+    }))
+    return true
   }
 
   const resetRound = () => {
-    if (!isJoined.value) {
+    if (!isJoined.value || !wsConnection) {
       console.error('Must join room before resetting round')
       return false
     }
 
-    return send({
+    wsConnection.send(JSON.stringify({
       type: 'reset'
-    })
+    }))
+    return true
   }
 
   const connectToRoom = () => {
-    connect()
+    if (wsConnection) {
+      status.value = 'CONNECTING'
+      wsConnection.open()
+    }
   }
 
   const leaveRoom = () => {
-    disconnect()
+    if (wsConnection) {
+      wsConnection.close()
+    }
     currentUser.value = null
     isJoined.value = false
+    status.value = 'CLOSED'
     roomState.value = {
       participants: [],
       votesRevealed: false,
@@ -183,7 +209,7 @@ export function usePokerRoom(roomId: string) {
     roomState: readonly(roomState),
     currentUser: readonly(currentUser),
     isJoined: readonly(isJoined),
-    wsState,
+    status, // WebSocket status from @vueuse/core
 
     // Computed
     myVote,

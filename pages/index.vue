@@ -10,13 +10,11 @@ async function createRoom() {
   error.value = ''
   
   try {
-    // Call the room creation API
-    const response = await $fetch('/api/room/create', {
-      method: 'POST',
-    }) as { roomId: string }
+    // Generate a random room ID (like the chat app does)
+    const roomId = Math.random().toString(36).substring(2, 10)
     
     // Navigate to the new room
-    await navigateTo(`/room/${response.roomId}`)
+    await navigateTo(`/room/${roomId}`)
   } catch (err: any) {
     console.error('Error creating room:', err)
     error.value = err.message || 'Failed to create room. Please try again.'

@@ -1,0 +1,21 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "planning-poker-websockets",
+	"main": "./index.ts",
+	"compatibility_date": "2025-06-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "POKER_ROOM",
+				"class_name": "PokerRoom"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_classes": ["PokerRoom"]
+		}
+	]
+}
