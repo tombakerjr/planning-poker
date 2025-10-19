@@ -16,6 +16,12 @@
 			}
 		]
 	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_classes": ["PokerRoom"]
+		}
+	],
 	"observability": {
 		"enabled": true
 	}

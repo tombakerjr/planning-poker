@@ -281,13 +281,12 @@ export function usePokerRoom(roomId: string) {
   // Try to auto-rejoin if we have a saved session
   const tryAutoRejoin = () => {
     const session = getUserSession()
-    if (session && session.name && session.timestamp) {
-      // Check if session is recent
-      const sessionAge = Date.now() - session.timestamp
-      if (sessionAge < SESSION_EXPIRY_MS) {
+    if (session && session.name) {
+      // Check if session is recent (verify timestamp exists to avoid NaN)
+      if (session.timestamp && (Date.now() - session.timestamp) < SESSION_EXPIRY_MS) {
         return joinRoom(session.name)
       } else {
-        // Clear old session
+        // Clear old or invalid session
         if (process.client) {
           localStorage.removeItem(`poker-session-${roomId}`)
         }

@@ -33,7 +33,7 @@ function handleSelect(value: string | number) {
     <div class="text-center">
       <h2 class="text-lg font-semibold text-gray-600">Story for Estimation:</h2>
       <p class="mb-6 text-xl font-bold text-gray-800">
-        {{ roomState.storyTitle || 'As a user, I want to see my vote reflected in the UI.' }}
+        {{ roomState.storyTitle || 'No story set yet' }}
       </p>
     </div>
 
