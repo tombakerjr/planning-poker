@@ -38,7 +38,19 @@ This plan outlines incremental improvements to enhance security, reliability, pe
 
 **Priority:** HIGH
 **Timeline:** 2-3 days
-**Status:** In Progress
+**Status:** COMPLETED (2025-10-19)
+
+**Summary:**
+Phase 1 successfully established a strong foundation for code quality and testing:
+- ✅ Eliminated all console.log statements (19 replacements)
+- ✅ Achieved full type safety (removed 2 `as any` assertions)
+- ✅ Set up comprehensive E2E testing with Playwright (18 tests)
+- ✅ Documented coverage limitations and future paths
+- ✅ All unit tests passing (11/11)
+- ✅ Professional logging with environment-based levels
+- ✅ Type-safe provide/inject patterns
+
+**Total Time:** ~3.5 hours (faster than estimated 2-3 days)
 
 ### 1.1 Clean Up Console Logging ✅
 
@@ -202,94 +214,83 @@ Add to `server/poker-room.test.ts`:
 
 ---
 
-### 1.4 Add E2E Testing ⏳
+### 1.4 Add E2E Testing ✅
 
 **Goal:** Set up end-to-end testing for critical user flows
 
+**Status:** COMPLETED (2025-10-19)
+
 **Technology:** Playwright (recommended for Cloudflare Workers)
 
-**Implementation:**
+**Implementation Summary:**
 
-**Step 1: Install Playwright**
-```bash
-pnpm add -D @playwright/test
-npx playwright install
-```
+**Files Created:**
+- `playwright.config.ts` - Playwright configuration for Workers
+- `e2e/room-creation.spec.ts` - Room creation flow tests (3 tests)
+- `e2e/voting-flow.spec.ts` - Complete voting flow tests (5 tests)
+- `e2e/multi-user.spec.ts` - Multi-user collaboration tests (3 tests)
+- `e2e/connection.spec.ts` - WebSocket connection & session tests (7 tests)
 
-**Step 2: Configure Playwright**
-
-**`playwright.config.ts`**
+**Configuration:**
 ```typescript
-import { defineConfig } from '@playwright/test'
-
-export default defineConfig({
-  testDir: './tests/e2e',
-  use: {
-    baseURL: 'http://localhost:3000',
-  },
-  webServer: {
-    command: 'pnpm dev',
-    port: 3000,
-    reuseExistingServer: !process.env.CI,
-  },
-})
+// playwright.config.ts highlights:
+- baseURL: 'http://localhost:8787' (Wrangler dev server)
+- webServer: 'pnpm preview' (builds + runs Wrangler)
+- Browser: Chromium only (can expand to Firefox/WebKit later)
+- Reporters: HTML + List
+- Auto-retry on CI: 2 attempts
 ```
 
-**Step 3: Create E2E Tests**
+**Test Coverage:**
+- **Room Creation** (3 tests):
+  - Create room and navigate
+  - Room ID validation
+  - Rapid creation handling
 
-**`tests/e2e/room-flow.spec.ts`**
-```typescript
-test('complete voting flow', async ({ page, context }) => {
-  // User 1: Create room
-  await page.goto('/')
-  await page.click('text=Create Room')
-  const roomUrl = await page.url()
+- **Voting Flow** (5 tests):
+  - Complete voting round (single user)
+  - Change vote before reveal
+  - Deselect vote
+  - Coffee break vote
+  - Reset round and re-vote
 
-  // User 1: Join room
-  await page.fill('input[name="name"]', 'Alice')
-  await page.click('text=Join Room')
+- **Multi-User** (3 tests):
+  - Two users voting together
+  - Waiting state when not all voted
+  - New round sync across users
 
-  // User 2: Join same room
-  const page2 = await context.newPage()
-  await page2.goto(roomUrl)
-  await page2.fill('input[name="name"]', 'Bob')
-  await page2.click('text=Join Room')
+- **Connection & Session** (7 tests):
+  - WebSocket connection establishment
+  - Connection during voting
+  - Direct room URL navigation
+  - Stable connection across interactions
+  - Session persistence after reload
+  - LocalStorage session validation
 
-  // Both users vote
-  await page.click('text=5')
-  await page2.click('text=8')
-
-  // User 1 reveals votes
-  await page.click('text=Reveal Votes')
-
-  // Verify votes are visible
-  await expect(page.locator('text=5')).toBeVisible()
-  await expect(page.locator('text=8')).toBeVisible()
-
-  // Reset round
-  await page.click('text=New Round')
-
-  // Verify votes cleared
-  await expect(page.locator('text=5')).not.toBeVisible()
-})
-
-test('reconnection after disconnect', async ({ page }) => {
-  // ... test reconnection logic
-})
-
-test('error handling for invalid actions', async ({ page }) => {
-  // ... test error scenarios
-})
+**Scripts Added:**
+```json
+"test:e2e": "playwright test",
+"test:e2e:ui": "playwright test --ui",
+"test:e2e:debug": "playwright test --debug",
+"test:e2e:headed": "playwright test --headed"
 ```
+
+**Vitest Configuration:**
+- Excluded `e2e/**` directory from Vitest to prevent conflicts
+- Playwright tests use `.spec.ts` extension
+- Unit tests use `.test.ts` extension
 
 **Success Criteria:**
-- [ ] Playwright installed and configured
-- [ ] E2E tests for critical user flows
-- [ ] Tests run in CI pipeline
-- [ ] Tests cover multi-user scenarios
-- [ ] Reconnection scenarios tested
+- [x] Playwright installed and configured
+- [x] E2E tests for critical user flows (18 tests total)
+- [ ] Tests run in CI pipeline (manual for now)
+- [x] Tests cover multi-user scenarios
+- [x] Connection/reconnection scenarios tested
+- [x] Session persistence tested
 
-**Estimated Time:** 1 day
+**Total E2E Tests:** 18 test cases covering all critical flows
+
+**Actual Time:** 2 hours
 
 ---
 
