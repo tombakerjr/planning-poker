@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { logger } from '~/server/utils/logger'
+import { PokerRoomKey } from '~/composables/usePokerRoom'
+
 const pokerDeck = ['1', '2', '3', '5', '8', '13', '21', '?', '☕️']
 
-// Inject the poker room state and actions
-const pokerRoom = inject('pokerRoom') as any
+// Inject the poker room state and actions with type safety
+const pokerRoom = inject(PokerRoomKey)
+if (!pokerRoom) throw new Error('PokerRoom not provided')
+
 const { roomState, isJoined, vote, myVote, votingComplete, averageVote } = pokerRoom
 
 const selectedValue = ref<string | number | null>(null)
@@ -16,13 +21,13 @@ watchEffect(() => {
 
 function handleSelect(value: string | number) {
   if (!isJoined.value) {
-    console.warn('Must join room before voting')
+    logger.warn('Must join room before voting')
     return
   }
 
   const newValue = selectedValue.value === value ? null : value
   selectedValue.value = newValue
-  
+
   // Send vote to server
   vote(newValue)
 }

@@ -1,6 +1,7 @@
-import { ref, computed, readonly, onUnmounted } from 'vue'
+import { ref, computed, readonly, onUnmounted, type InjectionKey } from 'vue'
 import { nanoid } from 'nanoid'
 import { useToast } from './useToast'
+import { logger } from '~/server/utils/logger'
 
 export interface Participant {
   id: string
@@ -70,8 +71,8 @@ export function usePokerRoom(roomId: string) {
   const userId = existingSession?.userId || `user-${nanoid()}`
 
   if (IS_DEV) {
-    console.log('Room ID:', roomId)
-    console.log('User ID:', userId)
+    logger.debug('Room ID:', roomId)
+    logger.debug('User ID:', userId)
   }
 
   function handleMessage(message: RoomMessage) {
@@ -98,12 +99,12 @@ export function usePokerRoom(roomId: string) {
         break
 
       case 'error':
-        console.error('Room error:', message.payload?.message)
+        logger.error('Room error:', message.payload?.message)
         toast.error(message.payload?.message || 'An error occurred')
         break
 
       default:
-        console.warn('Unknown message type:', message.type)
+        logger.warn('Unknown message type:', message.type)
     }
   }
 
@@ -118,7 +119,7 @@ export function usePokerRoom(roomId: string) {
     }
 
     if (IS_DEV) {
-      console.log('Connecting to room via WebSocket...')
+      logger.debug('Connecting to room via WebSocket...')
     }
     status.value = 'CONNECTING'
 
@@ -127,7 +128,7 @@ export function usePokerRoom(roomId: string) {
     const wsUrl = `${protocol}//${window.location.host}/api/room/${roomId}/ws`
 
     if (IS_DEV) {
-      console.log('WebSocket URL:', wsUrl)
+      logger.debug('WebSocket URL:', wsUrl)
     }
 
     try {
@@ -135,7 +136,7 @@ export function usePokerRoom(roomId: string) {
 
       ws.onopen = () => {
         if (IS_DEV) {
-          console.log('WebSocket connection opened')
+          logger.debug('WebSocket connection opened')
         }
 
         // Show reconnection success toast if this was a reconnect
@@ -163,24 +164,24 @@ export function usePokerRoom(roomId: string) {
           const data = JSON.parse(event.data)
           handleMessage(data)
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error)
+          logger.error('Failed to parse WebSocket message:', error)
         }
       }
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
+        logger.error('WebSocket error:', error)
       }
 
       ws.onclose = (event) => {
         if (IS_DEV) {
-          console.log('WebSocket closed:', event.code, event.reason)
+          logger.debug('WebSocket closed:', event.code, event.reason)
         }
         stopHeartbeat()
 
         // Attempt to reconnect with exponential backoff
         if (event.code !== 1000) { // 1000 = normal closure
           if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.error('Max reconnection attempts reached. Please refresh the page.')
+            logger.error('Max reconnection attempts reached. Please refresh the page.')
             status.value = 'CLOSED'
             toast.error('Connection lost. Please refresh the page to reconnect.', 10000)
             return
@@ -191,7 +192,7 @@ export function usePokerRoom(roomId: string) {
           // Exponential backoff: 1s, 2s, 4s, 8s, ... up to 30s
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
           if (IS_DEV) {
-            console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+            logger.debug(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
           }
 
           // Show reconnection toast
@@ -210,7 +211,7 @@ export function usePokerRoom(roomId: string) {
         }
       }
     } catch (error) {
-      console.error('Failed to create WebSocket:', error)
+      logger.error('Failed to create WebSocket:', error)
       status.value = 'CLOSED'
     }
   }
@@ -278,12 +279,12 @@ export function usePokerRoom(roomId: string) {
     const trimmedName = name.trim().substring(0, MAX_NAME_LENGTH);
 
     if (!trimmedName) {
-      console.error('Name is required to join room')
+      logger.error('Name is required to join room')
       return false
     }
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected')
+      logger.error('WebSocket is not connected')
       return false
     }
 
@@ -306,7 +307,7 @@ export function usePokerRoom(roomId: string) {
       isJoined.value = true
       return true
     } catch (error) {
-      console.error('Failed to join room:', error)
+      logger.error('Failed to join room:', error)
       return false
     }
   }
@@ -348,7 +349,7 @@ export function usePokerRoom(roomId: string) {
 
       return true
     } catch (error) {
-      console.error('Failed to vote:', error)
+      logger.error('Failed to vote:', error)
       toast.error('Failed to submit vote')
       return false
     } finally {
@@ -376,7 +377,7 @@ export function usePokerRoom(roomId: string) {
       toast.success('Votes revealed!')
       return true
     } catch (error) {
-      console.error('Failed to reveal votes:', error)
+      logger.error('Failed to reveal votes:', error)
       toast.error('Failed to reveal votes')
       return false
     } finally {
@@ -404,7 +405,7 @@ export function usePokerRoom(roomId: string) {
       toast.success('New round started!')
       return true
     } catch (error) {
-      console.error('Failed to reset round:', error)
+      logger.error('Failed to reset round:', error)
       toast.error('Failed to start new round')
       return false
     } finally {
@@ -455,3 +456,7 @@ export function usePokerRoom(roomId: string) {
     resetRound,
   }
 }
+
+// Type-safe injection key for providing/injecting the poker room composable
+export type PokerRoomComposable = ReturnType<typeof usePokerRoom>
+export const PokerRoomKey: InjectionKey<PokerRoomComposable> = Symbol('pokerRoom')

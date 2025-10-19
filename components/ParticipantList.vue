@@ -1,6 +1,10 @@
 <script setup lang="ts">
-// Inject the poker room state and actions
-const pokerRoom = inject('pokerRoom') as any
+import { PokerRoomKey } from '~/composables/usePokerRoom'
+
+// Inject the poker room state and actions with type safety
+const pokerRoom = inject(PokerRoomKey)
+if (!pokerRoom) throw new Error('PokerRoom not provided')
+
 const { roomState, revealVotes, resetRound, isJoined, votingComplete, isLoading, status } = pokerRoom
 </script>
 
@@ -83,13 +87,13 @@ const { roomState, revealVotes, resetRound, isJoined, votingComplete, isLoading,
     <div v-if="roomState.participants.length > 0" class="mt-4">
       <div class="flex justify-between text-xs text-gray-500 mb-1">
         <span>Voting Progress</span>
-        <span>{{ roomState.participants.filter((p: any) => p.vote !== null).length }}/{{ roomState.participants.length }}</span>
+        <span>{{ roomState.participants.filter(p => p.vote !== null).length }}/{{ roomState.participants.length }}</span>
       </div>
       <div class="w-full bg-gray-200 rounded-full h-2">
         <div
           class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-          :style="{ 
-            width: `${(roomState.participants.filter((p: any) => p.vote !== null).length / roomState.participants.length) * 100}%` 
+          :style="{
+            width: `${(roomState.participants.filter(p => p.vote !== null).length / roomState.participants.length) * 100}%`
           }"
         ></div>
       </div>
