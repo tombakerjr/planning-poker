@@ -137,6 +137,12 @@ export function usePokerRoom(roomId: string) {
         if (IS_DEV) {
           console.log('WebSocket connection opened')
         }
+
+        // Show reconnection success toast if this was a reconnect
+        if (reconnectAttempts > 0) {
+          toast.success('Reconnected successfully!')
+        }
+
         status.value = 'OPEN'
         reconnectAttempts = 0 // Reset reconnection counter on successful connection
 

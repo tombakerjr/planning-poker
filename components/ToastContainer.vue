@@ -35,7 +35,12 @@ const getColorClasses = (type: string) => {
 </script>
 
 <template>
-  <div class="pointer-events-none fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-start sm:justify-end sm:p-6">
+  <div
+    class="pointer-events-none fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-start sm:justify-end sm:p-6"
+    aria-live="polite"
+    aria-atomic="true"
+    role="status"
+  >
     <div class="flex w-full flex-col items-center space-y-4 sm:items-end">
       <TransitionGroup
         enter-active-class="transform transition duration-300 ease-out"
