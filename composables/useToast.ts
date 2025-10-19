@@ -1,0 +1,67 @@
+import { ref } from 'vue'
+
+export interface Toast {
+  id: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  message: string
+  duration?: number
+}
+
+const toasts = ref<Toast[]>([])
+const timers = new Map<string, ReturnType<typeof setTimeout>>()
+let nextId = 0
+
+export function useToast() {
+  const addToast = (type: Toast['type'], message: string, duration = 5000) => {
+    const id = `toast-${nextId++}`
+    const toast: Toast = { id, type, message, duration }
+
+    toasts.value.push(toast)
+
+    if (duration > 0) {
+      const timer = setTimeout(() => {
+        removeToast(id)
+      }, duration)
+      timers.set(id, timer)
+    }
+  }
+
+  const removeToast = (id: string) => {
+    const index = toasts.value.findIndex(t => t.id === id)
+    if (index !== -1) {
+      toasts.value.splice(index, 1)
+    }
+
+    // Clear timer if exists to prevent memory leak
+    const timer = timers.get(id)
+    if (timer) {
+      clearTimeout(timer)
+      timers.delete(id)
+    }
+  }
+
+  const success = (message: string, duration?: number) => {
+    addToast('success', message, duration)
+  }
+
+  const error = (message: string, duration?: number) => {
+    addToast('error', message, duration)
+  }
+
+  const warning = (message: string, duration?: number) => {
+    addToast('warning', message, duration)
+  }
+
+  const info = (message: string, duration?: number) => {
+    addToast('info', message, duration)
+  }
+
+  return {
+    toasts,
+    success,
+    error,
+    warning,
+    info,
+    removeToast,
+  }
+}

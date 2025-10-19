@@ -10,7 +10,9 @@ const {
   roomState,
   currentUser,
   isJoined,
-  status, // Updated from wsState to status
+  status,
+  isLoading,
+  reconnectAttempts,
   connectToRoom,
   leaveRoom,
   joinRoom,
@@ -71,7 +73,7 @@ provide('pokerRoom', pokerRoom)
               class="h-2 w-2 rounded-full"
               :class="{
                 'bg-green-500': status === 'OPEN',
-                'bg-yellow-500': status === 'CONNECTING',
+                'bg-yellow-500 animate-pulse': status === 'CONNECTING' || status === 'RECONNECTING',
                 'bg-red-500': status === 'CLOSED'
               }"
             />
@@ -81,6 +83,8 @@ provide('pokerRoom', pokerRoom)
                   ? 'Connected'
                   : status === 'CONNECTING'
                   ? 'Connecting...'
+                  : status === 'RECONNECTING'
+                  ? `Reconnecting (${reconnectAttempts}/10)...`
                   : 'Disconnected'
               }}
             </span>
@@ -147,5 +151,8 @@ provide('pokerRoom', pokerRoom)
       @join="handleJoinRoom"
       @close="showNameModal = false"
     />
+
+    <!-- Toast Notifications -->
+    <ToastContainer />
   </div>
 </template>
