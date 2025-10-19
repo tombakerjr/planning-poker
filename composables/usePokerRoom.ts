@@ -22,6 +22,7 @@ const MAX_RECONNECT_ATTEMPTS = 10
 const HEARTBEAT_INTERVAL_MS = 25000 // 25 seconds (less than server's 30s)
 const MAX_NAME_LENGTH = 50
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
+const IS_DEV = process.env.NODE_ENV === 'development'
 
 export function usePokerRoom(roomId: string) {
   const roomState = ref<RoomState>({
@@ -64,8 +65,10 @@ export function usePokerRoom(roomId: string) {
   const existingSession = getUserSession()
   const userId = existingSession?.userId || `user-${nanoid()}`
 
-  console.log('Room ID:', roomId)
-  console.log('User ID:', userId)
+  if (IS_DEV) {
+    console.log('Room ID:', roomId)
+    console.log('User ID:', userId)
+  }
 
   function handleMessage(message: RoomMessage) {
     switch (message.type) {
@@ -109,20 +112,26 @@ export function usePokerRoom(roomId: string) {
       return
     }
 
-    console.log('Connecting to room via WebSocket...')
+    if (IS_DEV) {
+      console.log('Connecting to room via WebSocket...')
+    }
     status.value = 'CONNECTING'
 
     // Construct WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${protocol}//${window.location.host}/api/room/${roomId}/ws`
 
-    console.log('WebSocket URL:', wsUrl)
+    if (IS_DEV) {
+      console.log('WebSocket URL:', wsUrl)
+    }
 
     try {
       ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
-        console.log('WebSocket connection opened')
+        if (IS_DEV) {
+          console.log('WebSocket connection opened')
+        }
         status.value = 'OPEN'
         reconnectAttempts = 0 // Reset reconnection counter on successful connection
 
@@ -152,7 +161,9 @@ export function usePokerRoom(roomId: string) {
       }
 
       ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason)
+        if (IS_DEV) {
+          console.log('WebSocket closed:', event.code, event.reason)
+        }
         status.value = 'CLOSED'
         stopHeartbeat()
 
@@ -166,7 +177,9 @@ export function usePokerRoom(roomId: string) {
 
           // Exponential backoff: 1s, 2s, 4s, 8s, ... up to 30s
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
-          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+          if (IS_DEV) {
+            console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+          }
 
           reconnectTimeout = setTimeout(() => {
             if (status.value === 'CLOSED') {
