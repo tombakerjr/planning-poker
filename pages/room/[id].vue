@@ -58,9 +58,6 @@ watch(status, (newStatus) => {
     // Connection lost, might want to show reconnection status
   }
 })
-
-// Provide the room state and actions to child components
-provide('pokerRoom', pokerRoom)
 </script>
 
 <template>
