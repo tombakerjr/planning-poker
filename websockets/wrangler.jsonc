@@ -17,5 +17,10 @@
 			"tag": "v1",
 			"new_classes": ["PokerRoom"]
 		}
-	]
+	],
+	"observability": {
+		"logs": {
+			"enabled": true
+		}
+	}
 }
