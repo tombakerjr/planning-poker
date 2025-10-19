@@ -10,6 +10,10 @@ const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Periodically cleanup old entries to prevent memory leak
+  cleanupOldRateLimits(now);
+
   const rateLimit = rateLimitMap.get(ip);
 
   if (!rateLimit) {
@@ -34,15 +38,30 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
+function cleanupOldRateLimits(now: number) {
+  // Remove entries older than 2x the window to prevent memory leak
+  for (const [ip, data] of rateLimitMap.entries()) {
+    if (now - data.windowStart >= RATE_LIMIT_WINDOW_MS * 2) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}
+
 export default defineEventHandler(async (event) => {
   try {
     // Get client IP for rate limiting
     const ip = getRequestHeader(event, 'cf-connecting-ip') ||
-               getRequestHeader(event, 'x-forwarded-for') ||
-               'unknown';
+               getRequestHeader(event, 'x-forwarded-for');
+
+    if (!ip) {
+      logger.warn('Unable to determine client IP for rate limiting');
+    }
+
+    // Use unique fallback per request to avoid shared rate limits
+    const effectiveIp = ip || `unknown-${Date.now()}-${Math.random()}`;
 
     // Check rate limit
-    if (!checkRateLimit(ip)) {
+    if (!checkRateLimit(effectiveIp)) {
       throw createError({
         statusCode: 429,
         statusMessage: 'Too many room creation requests. Please try again later.'
