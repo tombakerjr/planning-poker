@@ -1,8 +1,53 @@
 import { DurableObject } from "cloudflare:workers";
 
+// Simple logging utility for Durable Objects
+enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+}
+
+const LOG_LEVEL = LogLevel.WARN; // Only log warnings and errors in production
+
+function log(level: LogLevel, message: string, ...args: any[]) {
+  if (level < LOG_LEVEL) return;
+
+  const timestamp = new Date().toISOString();
+  const levelName = LogLevel[level];
+  const logEntry = { timestamp, level: levelName, message, ...(args.length > 0 && { data: args }) };
+
+  switch (level) {
+    case LogLevel.DEBUG:
+      console.debug(JSON.stringify(logEntry));
+      break;
+    case LogLevel.INFO:
+      console.log(JSON.stringify(logEntry));
+      break;
+    case LogLevel.WARN:
+      console.warn(JSON.stringify(logEntry));
+      break;
+    case LogLevel.ERROR:
+      console.error(JSON.stringify(logEntry));
+      break;
+  }
+}
+
+const logger = {
+  debug: (msg: string, ...args: any[]) => log(LogLevel.DEBUG, msg, ...args),
+  info: (msg: string, ...args: any[]) => log(LogLevel.INFO, msg, ...args),
+  warn: (msg: string, ...args: any[]) => log(LogLevel.WARN, msg, ...args),
+  error: (msg: string, ...args: any[]) => log(LogLevel.ERROR, msg, ...args),
+};
+
 const MAX_MESSAGE_SIZE = 1024 * 10; // 10KB
 const MAX_NAME_LENGTH = 50;
 const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
+
+// Rate limiting constants
+const MAX_MESSAGES_PER_SECOND = 10;
+const RATE_LIMIT_WINDOW_MS = 1000; // 1 second
+const MAX_CONNECTIONS_PER_DO = 100;
 
 interface Participant {
   name: string;
@@ -59,9 +104,15 @@ interface WebSocketMeta {
   userId: string;
 }
 
+interface RateLimitInfo {
+  messageCount: number;
+  windowStart: number;
+}
+
 export class PokerRoom extends DurableObject {
   private sessions = new Map<WebSocket, WebSocketMeta>();
   private heartbeatIntervals = new Map<WebSocket, number>();
+  private rateLimits = new Map<WebSocket, RateLimitInfo>();
 
   override async fetch(request: Request): Promise<Response> {
     // Handle WebSocket upgrade requests
@@ -73,6 +124,12 @@ export class PokerRoom extends DurableObject {
   }
 
   private async handleWebSocketUpgrade(_request: Request): Promise<Response> {
+    // Check connection limit
+    const currentConnections = this.ctx.getWebSockets().length;
+    if (currentConnections >= MAX_CONNECTIONS_PER_DO) {
+      return new Response("Too many connections", { status: 429 });
+    }
+
     // Create WebSocket pair
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
@@ -95,24 +152,33 @@ export class PokerRoom extends DurableObject {
   }
 
   override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+    // Check rate limit
+    if (!this.checkRateLimit(ws)) {
+      ws.send(JSON.stringify({
+        type: "error",
+        payload: { message: "Rate limit exceeded. Please slow down." }
+      }));
+      return;
+    }
+
     // Restore session from attachment if not in memory (after hibernation)
     if (!this.sessions.has(ws)) {
       const meta = ws.deserializeAttachment() as WebSocketMeta | null;
       if (meta) {
-        console.log(`Restored session for user ${meta.userId} after hibernation`);
+        logger.info(`Restored session for user ${meta.userId} after hibernation`);
         this.sessions.set(ws, meta);
       }
     }
 
     // Validate message type and size
     if (typeof message !== "string") {
-      console.error(`Invalid message type: ${typeof message}`);
+      logger.warn(`Invalid message type: ${typeof message}`);
       ws.close(1003, "Invalid message type");
       return;
     }
 
     if (message.length > MAX_MESSAGE_SIZE) {
-      console.error(`Message too large: ${message.length} bytes`);
+      logger.warn(`Message too large: ${message.length} bytes`);
       ws.close(1009, "Message too large");
       return;
     }
@@ -138,7 +204,7 @@ export class PokerRoom extends DurableObject {
       // For other messages, get userId from metadata
       const meta = this.sessions.get(ws);
       if (!meta) {
-        console.error("WebSocket not authenticated");
+        logger.warn("WebSocket not authenticated");
         ws.close(1003, "Not authenticated");
         return;
       }
@@ -152,7 +218,7 @@ export class PokerRoom extends DurableObject {
       // Handle room messages
       await this.handleMessage(ws, meta.userId, parsed);
     } catch (err) {
-      console.error("Message processing error:", err);
+      logger.error("Message processing error:", err);
       ws.close(1003, "Invalid message format");
     }
   }
@@ -171,10 +237,13 @@ export class PokerRoom extends DurableObject {
       await this.handleDisconnect(meta.userId);
       this.sessions.delete(ws);
     }
+
+    // Clean up rate limit info
+    this.rateLimits.delete(ws);
   }
 
   override async webSocketError(ws: WebSocket, error: unknown) {
-    console.error("WebSocket error:", error);
+    logger.error("WebSocket error:", error);
     const meta = this.sessions.get(ws);
     if (meta) {
       this.sessions.delete(ws);
@@ -268,7 +337,7 @@ export class PokerRoom extends DurableObject {
     try {
       ws.send(JSON.stringify(message));
     } catch (error) {
-      console.error("Failed to send room state:", error);
+      logger.error("Failed to send room state:", error);
     }
   }
 
@@ -284,7 +353,7 @@ export class PokerRoom extends DurableObject {
       try {
         ws.send(serializedMessage);
       } catch (error) {
-        console.error("Failed to send message to WebSocket:", error);
+        logger.error("Failed to send message to WebSocket:", error);
       }
     }
   }
@@ -311,7 +380,7 @@ export class PokerRoom extends DurableObject {
       try {
         ws.send(JSON.stringify({ type: "ping" }));
       } catch (error) {
-        console.error("Failed to send ping:", error);
+        logger.error("Failed to send ping:", error);
         this.stopHeartbeat(ws);
       }
     }, HEARTBEAT_INTERVAL_MS) as unknown as number;
@@ -325,5 +394,37 @@ export class PokerRoom extends DurableObject {
       clearInterval(intervalId);
       this.heartbeatIntervals.delete(ws);
     }
+  }
+
+  private checkRateLimit(ws: WebSocket): boolean {
+    const now = Date.now();
+    const rateLimit = this.rateLimits.get(ws);
+
+    if (!rateLimit) {
+      // First message, initialize rate limit tracking
+      this.rateLimits.set(ws, {
+        messageCount: 1,
+        windowStart: now
+      });
+      return true;
+    }
+
+    // Check if we're in a new window
+    if (now - rateLimit.windowStart >= RATE_LIMIT_WINDOW_MS) {
+      // Reset to new window
+      rateLimit.messageCount = 1;
+      rateLimit.windowStart = now;
+      return true;
+    }
+
+    // Increment message count
+    rateLimit.messageCount++;
+
+    // Check if limit exceeded
+    if (rateLimit.messageCount > MAX_MESSAGES_PER_SECOND) {
+      return false;
+    }
+
+    return true;
   }
 }
