@@ -159,6 +159,54 @@ The `usePokerRoom` composable handles:
 
 ## Development Workflow
 
+### Standard GitHub Issue Workflow
+
+When working on a GitHub issue, follow this standardized process:
+
+1. **Start from main branch**
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+2. **Create feature branch** from the issue number
+   ```bash
+   git checkout -b phase{X}-{brief-description}
+   # Example: phase4b-performance-optimizations
+   ```
+
+3. **Implement the feature**
+   - Make code changes
+   - Add/update tests
+   - Update documentation as needed
+   - Run tests to verify: `pnpm test --run`
+
+4. **Commit and push**
+   ```bash
+   git add .
+   git commit -m "Phase X: Brief description"
+   git push origin {branch-name}
+   ```
+
+5. **Open Pull Request**
+   ```bash
+   gh pr create --title "Phase X: Description" --body "..."
+   ```
+
+6. **Wait for automated checks** (2-3 minutes)
+   - Claude Code review comments
+   - Cloudflare deployment check
+
+7. **Review and address feedback**
+   - Check Claude Code review comments
+   - Verify Cloudflare deployment succeeded
+   - Address any critical issues found
+   - Push additional commits if needed
+
+8. **Wait for human review**
+   - PR is ready for final review
+   - Wait for approval and merge
+
 ### Creating a New Room Feature
 
 1. **Modify Durable Object**: Update `server/poker-room.ts` to handle new message type
