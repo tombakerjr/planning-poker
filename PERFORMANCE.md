@@ -102,6 +102,31 @@ After (10 users voting in 500ms):
 (Approximately 1-2 broadcasts total)
 ```
 
+**Resource Cleanup**:
+To prevent memory leaks, the debounce timeout is cleaned up in two scenarios:
+1. **Last client disconnects** (`webSocketClose()` at lines 245-251): Clears timeout when no WebSocket connections remain
+2. **Room becomes empty** (`handleDisconnect()` at lines 330-334): Immediately clears timeout and broadcasts final state when last participant leaves
+
+**Known Limitations**:
+
+*State Synchronization During Debounce Window*
+
+The debounced broadcast fetches the current room state when the timeout fires (not when scheduled). This means state changes within the 100ms window are automatically batched, but there's a theoretical race condition:
+
+```
+t=0ms:   User A votes → scheduleBroadcast()
+t=50ms:  User B votes → scheduleBroadcast() (clears previous timeout)
+t=100ms: User C disconnects → handleDisconnect() modifies state
+t=150ms: Timeout fires → broadcastState() sends state (may include stale data)
+```
+
+**Why this is acceptable**:
+- The 100ms debounce window is extremely short
+- Any state inconsistencies self-correct on the next update
+- The planning poker use case tolerates brief inconsistencies
+- The performance benefits (30-50% reduction in broadcasts) outweigh this minor edge case
+- Alternative approaches (passing state to debounce) add complexity without meaningful benefit
+
 ---
 
 ### Performance Metrics

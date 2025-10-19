@@ -241,6 +241,14 @@ export class PokerRoom extends DurableObject {
 
     // Clean up rate limit info
     this.rateLimits.delete(ws);
+
+    // Clean up debounce timeout if no more connections
+    // This prevents memory leaks when the last client disconnects
+    const remainingConnections = this.ctx.getWebSockets().length;
+    if (remainingConnections === 0 && this.broadcastDebounceTimeout) {
+      clearTimeout(this.broadcastDebounceTimeout);
+      this.broadcastDebounceTimeout = undefined;
+    }
   }
 
   override async webSocketError(ws: WebSocket, error: unknown) {
@@ -316,7 +324,17 @@ export class PokerRoom extends DurableObject {
     const roomState = await this.getRoomState();
     delete roomState.participants[userId];
     await this.setRoomState(roomState);
-    this.scheduleBroadcast();
+
+    // If no participants remain, clean up the debounce timeout immediately
+    // to free resources faster
+    if (Object.keys(roomState.participants).length === 0 && this.broadcastDebounceTimeout) {
+      clearTimeout(this.broadcastDebounceTimeout);
+      this.broadcastDebounceTimeout = undefined;
+      // Still broadcast the final state showing empty room
+      await this.broadcastState();
+    } else {
+      this.scheduleBroadcast();
+    }
   }
 
   private serializeRoomState(roomState: RoomStorage) {
