@@ -1,5 +1,6 @@
 import { ref, computed, readonly, onUnmounted } from 'vue'
 import { nanoid } from 'nanoid'
+import { useToast } from './useToast'
 
 export interface Participant {
   id: string
@@ -25,6 +26,8 @@ const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
 const IS_DEV = process.env.NODE_ENV === 'development'
 
 export function usePokerRoom(roomId: string) {
+  const toast = useToast()
+
   const roomState = ref<RoomState>({
     participants: [],
     votesRevealed: false,
@@ -33,7 +36,8 @@ export function usePokerRoom(roomId: string) {
 
   const currentUser = ref<{ id: string; name: string } | null>(null)
   const isJoined = ref(false)
-  const status = ref<'CONNECTING' | 'OPEN' | 'CLOSED'>('CLOSED')
+  const status = ref<'CONNECTING' | 'OPEN' | 'CLOSED' | 'RECONNECTING'>('CLOSED')
+  const isLoading = ref(false)
 
   let ws: WebSocket | null = null
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
@@ -95,6 +99,7 @@ export function usePokerRoom(roomId: string) {
 
       case 'error':
         console.error('Room error:', message.payload?.message)
+        toast.error(message.payload?.message || 'An error occurred')
         break
 
       default:
@@ -164,16 +169,18 @@ export function usePokerRoom(roomId: string) {
         if (IS_DEV) {
           console.log('WebSocket closed:', event.code, event.reason)
         }
-        status.value = 'CLOSED'
         stopHeartbeat()
 
         // Attempt to reconnect with exponential backoff
         if (event.code !== 1000) { // 1000 = normal closure
           if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             console.error('Max reconnection attempts reached. Please refresh the page.')
-            // TODO: Show user-friendly error message
+            status.value = 'CLOSED'
+            toast.error('Connection lost. Please refresh the page to reconnect.', 10000)
             return
           }
+
+          status.value = 'RECONNECTING'
 
           // Exponential backoff: 1s, 2s, 4s, 8s, ... up to 30s
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
@@ -181,12 +188,19 @@ export function usePokerRoom(roomId: string) {
             console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
           }
 
+          // Show reconnection toast
+          if (reconnectAttempts === 0) {
+            toast.warning('Connection lost. Attempting to reconnect...', delay + 1000)
+          }
+
           reconnectTimeout = setTimeout(() => {
-            if (status.value === 'CLOSED') {
+            if (status.value === 'RECONNECTING') {
               reconnectAttempts++
               connectToRoom()
             }
           }, delay)
+        } else {
+          status.value = 'CLOSED'
         }
       }
     } catch (error) {
@@ -310,16 +324,17 @@ export function usePokerRoom(roomId: string) {
 
   const vote = async (voteValue: string | number | null) => {
     if (!isJoined.value) {
-      console.error('Must join room before voting')
+      toast.error('Must join room before voting')
       return false
     }
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected')
+      toast.error('Not connected to room')
       return false
     }
 
     try {
+      isLoading.value = true
       ws.send(JSON.stringify({
         type: 'vote',
         vote: voteValue
@@ -328,53 +343,66 @@ export function usePokerRoom(roomId: string) {
       return true
     } catch (error) {
       console.error('Failed to vote:', error)
+      toast.error('Failed to submit vote')
       return false
+    } finally {
+      isLoading.value = false
     }
   }
 
   const revealVotes = async () => {
     if (!isJoined.value) {
-      console.error('Must join room before revealing votes')
+      toast.error('Must join room before revealing votes')
       return false
     }
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected')
+      toast.error('Not connected to room')
       return false
     }
 
     try {
+      isLoading.value = true
       ws.send(JSON.stringify({
         type: 'reveal'
       }))
 
+      toast.success('Votes revealed!')
       return true
     } catch (error) {
       console.error('Failed to reveal votes:', error)
+      toast.error('Failed to reveal votes')
       return false
+    } finally {
+      isLoading.value = false
     }
   }
 
   const resetRound = async () => {
     if (!isJoined.value) {
-      console.error('Must join room before resetting round')
+      toast.error('Must join room before resetting round')
       return false
     }
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected')
+      toast.error('Not connected to room')
       return false
     }
 
     try {
+      isLoading.value = true
       ws.send(JSON.stringify({
         type: 'reset'
       }))
 
+      toast.success('New round started!')
       return true
     } catch (error) {
       console.error('Failed to reset round:', error)
+      toast.error('Failed to start new round')
       return false
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -395,12 +423,16 @@ export function usePokerRoom(roomId: string) {
     closeConnection()
   })
 
+  const reconnectAttemptsRef = computed(() => reconnectAttempts)
+
   return {
     // State
     roomState: readonly(roomState),
     currentUser: readonly(currentUser),
     isJoined: readonly(isJoined),
     status,
+    isLoading: readonly(isLoading),
+    reconnectAttempts: reconnectAttemptsRef,
 
     // Computed
     myVote,

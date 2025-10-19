@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Inject the poker room state and actions
 const pokerRoom = inject('pokerRoom') as any
-const { roomState, revealVotes, resetRound, isJoined, votingComplete } = pokerRoom
+const { roomState, revealVotes, resetRound, isJoined, votingComplete, isLoading, status } = pokerRoom
 </script>
 
 <template>
@@ -42,18 +42,41 @@ const { roomState, revealVotes, resetRound, isJoined, votingComplete } = pokerRo
       <button
         v-if="!roomState.votesRevealed && votingComplete"
         @click="revealVotes"
-        class="w-full rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+        :disabled="isLoading || status !== 'OPEN'"
+        class="w-full rounded-md px-4 py-2 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+        :class="isLoading ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500'"
       >
-        Reveal Votes
+        <span v-if="isLoading" class="flex items-center justify-center">
+          <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Revealing...
+        </span>
+        <span v-else>Reveal Votes</span>
       </button>
-      
+
       <button
         v-if="roomState.votesRevealed"
         @click="resetRound"
-        class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        :disabled="isLoading || status !== 'OPEN'"
+        class="w-full rounded-md px-4 py-2 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+        :class="isLoading ? 'bg-blue-500' : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'"
       >
-        New Round
+        <span v-if="isLoading" class="flex items-center justify-center">
+          <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Starting...
+        </span>
+        <span v-else>New Round</span>
       </button>
+
+      <!-- Disconnected hint -->
+      <p v-if="status !== 'OPEN'" class="text-xs text-center text-gray-500 mt-2">
+        Reconnecting to enable controls...
+      </p>
     </div>
 
     <!-- Voting Progress -->
