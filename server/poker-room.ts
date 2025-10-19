@@ -59,6 +59,7 @@ interface WebSocketMeta {
 
 export class PokerRoom extends DurableObject {
   private sessions = new Map<WebSocket, WebSocketMeta>();
+  private heartbeatIntervals = new Map<WebSocket, number>();
 
   override async fetch(request: Request): Promise<Response> {
     // Handle WebSocket upgrade requests
@@ -92,6 +93,14 @@ export class PokerRoom extends DurableObject {
   }
 
   override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+    // Restore session from attachment if not in memory (after hibernation)
+    if (!this.sessions.has(ws)) {
+      const meta = ws.deserializeAttachment() as WebSocketMeta | null;
+      if (meta) {
+        this.sessions.set(ws, meta);
+      }
+    }
+
     // Validate message type and size
     if (typeof message !== "string") {
       console.error(`Invalid message type: ${typeof message}`);
@@ -138,7 +147,7 @@ export class PokerRoom extends DurableObject {
       }
 
       // Handle room messages
-      await this.handleMessage(meta.userId, parsed);
+      await this.handleMessage(ws, meta.userId, parsed);
     } catch (err) {
       console.error("Message processing error:", err);
       ws.close(1003, "Invalid message format");
@@ -151,6 +160,9 @@ export class PokerRoom extends DurableObject {
     _reason: string,
     _wasClean: boolean
   ) {
+    // Stop heartbeat to prevent memory leak
+    this.stopHeartbeat(ws);
+
     const meta = this.sessions.get(ws);
     if (meta) {
       await this.handleDisconnect(meta.userId);
@@ -166,7 +178,7 @@ export class PokerRoom extends DurableObject {
     }
   }
 
-  private async handleMessage(userId: string, message: WebSocketMessage) {
+  private async handleMessage(ws: WebSocket, userId: string, message: WebSocketMessage) {
     const roomState = await this.getRoomState();
 
     switch (message.type) {
@@ -179,19 +191,38 @@ export class PokerRoom extends DurableObject {
         break;
       }
       case "vote": {
-        // Record a participant's vote
-        if (roomState.participants[userId]) {
-          roomState.participants[userId].vote = message.vote;
+        // Validate user has joined before voting
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Must join room before voting" }
+          }));
+          return;
         }
+        roomState.participants[userId].vote = message.vote;
         break;
       }
       case "reveal": {
-        // Mark votes as revealed for all participants
+        // Validate user has joined before revealing
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Must join room before revealing votes" }
+          }));
+          return;
+        }
         roomState.votesRevealed = true;
         break;
       }
       case "reset": {
-        // Reset the room for a new round of voting
+        // Validate user has joined before resetting
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Must join room before resetting" }
+          }));
+          return;
+        }
         roomState.votesRevealed = false;
         for (const id in roomState.participants) {
           const participant = roomState.participants[id];
@@ -276,17 +307,27 @@ export class PokerRoom extends DurableObject {
   }
 
   private startHeartbeat(ws: WebSocket) {
+    // Clear any existing heartbeat for this WebSocket
+    this.stopHeartbeat(ws);
+
     // Send ping every 30 seconds to keep connection alive
     const intervalId = setInterval(() => {
       try {
         ws.send(JSON.stringify({ type: "ping" }));
       } catch (error) {
         console.error("Failed to send ping:", error);
-        clearInterval(intervalId);
+        this.stopHeartbeat(ws);
       }
     }, 30000) as unknown as number;
 
-    // Note: In WebSocket Hibernation, the interval will be cleared
-    // when the Durable Object hibernates
+    this.heartbeatIntervals.set(ws, intervalId);
+  }
+
+  private stopHeartbeat(ws: WebSocket) {
+    const intervalId = this.heartbeatIntervals.get(ws);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.heartbeatIntervals.delete(ws);
+    }
   }
 }
