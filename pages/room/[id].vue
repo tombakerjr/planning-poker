@@ -14,14 +14,25 @@ const {
   connectToRoom,
   leaveRoom,
   joinRoom,
+  tryAutoRejoin,
 } = pokerRoom
 
 const showNameModal = ref(true)
 
-// Don't auto-connect on mount - wait for user to join
-// onMounted(() => {
-//   connectToRoom()
-// })
+// Auto-connect when component mounts
+onMounted(() => {
+  connectToRoom()
+  
+  // Try to auto-rejoin if we have a saved session
+  setTimeout(() => {
+    if (status.value === 'OPEN' && !isJoined.value) {
+      const autoJoined = tryAutoRejoin()
+      if (autoJoined) {
+        showNameModal.value = false
+      }
+    }
+  }, 500) // Small delay to ensure connection is established
+})
 
 // Clean up when leaving the page
 onBeforeUnmount(() => {
@@ -132,7 +143,7 @@ provide('pokerRoom', pokerRoom)
 
     <!-- User Name Modal -->
     <UserNameModal
-      :show="showNameModal && !isJoined"
+      :show="showNameModal && status === 'OPEN'"
       @join="handleJoinRoom"
       @close="showNameModal = false"
     />

@@ -1,5 +1,4 @@
-import { ref, computed, readonly } from 'vue'
-import { useWebSocket } from '@vueuse/core'
+import { ref, computed, readonly, onUnmounted } from 'vue'
 
 export interface Participant {
   id: string
@@ -14,7 +13,7 @@ export interface RoomState {
 }
 
 export interface RoomMessage {
-  type: 'join' | 'vote' | 'reveal' | 'reset' | 'update' | 'error' | 'connected'
+  type: 'update' | 'error' | 'ping' | 'pong'
   payload?: any
 }
 
@@ -27,25 +26,39 @@ export function usePokerRoom(roomId: string) {
 
   const currentUser = ref<{ id: string; name: string } | null>(null)
   const isJoined = ref(false)
+  const status = ref<'CONNECTING' | 'OPEN' | 'CLOSED'>('CLOSED')
 
-  // Generate a unique user ID for this session
-  const userId = `user-${Math.random().toString(36).substring(2, 9)}`
+  let ws: WebSocket | null = null
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null
 
-  // WebSocket connection using @vueuse/core
-  const runtimeConfig = useRuntimeConfig()
-  
-  // In production, use the same origin but with ws/wss protocol
-  // In development, use the configured websocket URL
-  const websocketUrl = runtimeConfig.public.websocketUrl || (() => {
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      return `${protocol}//${window.location.host}`
+  // Try to restore user session from localStorage
+  const getUserSession = () => {
+    if (process.client) {
+      const stored = localStorage.getItem(`poker-session-${roomId}`)
+      if (stored) {
+        try {
+          return JSON.parse(stored)
+        } catch {
+          localStorage.removeItem(`poker-session-${roomId}`)
+        }
+      }
     }
-    return 'ws://localhost:8787' // Fallback for SSR
-  })()
-  
-  // We'll set up the WebSocket connection after joining
-  let wsConnection: ReturnType<typeof useWebSocket> | null = null
+    return null
+  }
+
+  const saveUserSession = (userId: string, name: string) => {
+    if (process.client) {
+      localStorage.setItem(`poker-session-${roomId}`, JSON.stringify({ userId, name, timestamp: Date.now() }))
+    }
+  }
+
+  // Generate or restore user ID
+  const existingSession = getUserSession()
+  const userId = existingSession?.userId || `user-${roomId}-${Math.random().toString(36).substring(2, 9)}-${Date.now().toString(36)}`
+
+  console.log('Room ID:', roomId)
+  console.log('User ID:', userId)
 
   function handleMessage(message: RoomMessage) {
     switch (message.type) {
@@ -59,6 +72,17 @@ export function usePokerRoom(roomId: string) {
         }
         break
 
+      case 'ping':
+        // Respond to server ping
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'pong' }))
+        }
+        break
+
+      case 'pong':
+        // Server acknowledged our ping
+        break
+
       case 'error':
         console.error('Room error:', message.payload?.message)
         break
@@ -68,157 +92,283 @@ export function usePokerRoom(roomId: string) {
     }
   }
 
-  // Computed properties
-  const myVote = computed(() => {
-    if (!currentUser.value) return null
-    const participant = roomState.value.participants.find(
-      p => p.id === userId // Use our generated userId instead of currentUser.id
-    )
-    return participant?.vote || null
-  })
-
-  const votingComplete = computed(() => {
-    const activeParticipants = roomState.value.participants.filter(p => p.vote !== null)
-    return activeParticipants.length === roomState.value.participants.length && 
-           roomState.value.participants.length > 0
-  })
-
-  const averageVote = computed(() => {
-    if (!roomState.value.votesRevealed) return null
-    
-    const numericVotes = roomState.value.participants
-      .map(p => p.vote)
-      .filter((vote): vote is number => typeof vote === 'number')
-    
-    if (numericVotes.length === 0) return null
-    
-    const sum = numericVotes.reduce((acc, vote) => acc + vote, 0)
-    return Math.round((sum / numericVotes.length) * 10) / 10
-  })
-
-  // Connection status
-  const status = ref<'CLOSED' | 'CONNECTING' | 'OPEN'>('CLOSED')
-
-  // Actions
-  const joinRoom = (name: string) => {
-    if (!name.trim()) {
-      console.error('Name is required to join room')
-      return false
+  // WebSocket connection functions
+  const connectToRoom = () => {
+    if (ws) {
+      ws.close()
     }
 
-    // Set up the current user
-    currentUser.value = {
-      id: userId,
-      name: name.trim()
+    if (!process.client) {
+      return
     }
 
-    // Create protocol header for authentication (room:userId encoded in base64url)
-    const auth = `${roomId}:${userId}`
-    const protocol = btoa(auth).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+    console.log('Connecting to room via WebSocket...')
+    status.value = 'CONNECTING'
 
-    // Set up WebSocket connection
-    wsConnection = useWebSocket(websocketUrl, {
-      protocols: [protocol, 'poker'],
-      onConnected: () => {
-        console.log('Connected to poker room:', roomId)
+    // Construct WebSocket URL
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${protocol}//${window.location.host}/api/room/${roomId}/ws`
+
+    console.log('WebSocket URL:', wsUrl)
+
+    try {
+      ws = new WebSocket(wsUrl)
+
+      ws.onopen = () => {
+        console.log('WebSocket connection opened')
         status.value = 'OPEN'
-        // Send join message
-        wsConnection?.send(JSON.stringify({
-          type: 'join',
-          name: name.trim()
-        }))
-        isJoined.value = true
-      },
-      onDisconnected: () => {
-        console.log('Disconnected from poker room:', roomId)
-        status.value = 'CLOSED'
-        isJoined.value = false
-      },
-      onError: (ws, error) => {
-        console.error('WebSocket error:', error)
-        status.value = 'CLOSED'
-      },
-      onMessage: (ws, event) => {
+
+        // Send authentication message
+        if (ws) {
+          ws.send(JSON.stringify({
+            type: 'auth',
+            userId: userId
+          }))
+        }
+
+        // Start heartbeat
+        startHeartbeat()
+      }
+
+      ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
           handleMessage(data)
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error)
         }
-      },
-    })
+      }
 
-    // Open the connection
-    status.value = 'CONNECTING'
-    wsConnection.open()
-    
-    return true
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+      }
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason)
+        status.value = 'CLOSED'
+        stopHeartbeat()
+
+        // Attempt to reconnect after a delay
+        if (event.code !== 1000) { // 1000 = normal closure
+          reconnectTimeout = setTimeout(() => {
+            if (status.value === 'CLOSED') {
+              console.log('Attempting to reconnect...')
+              connectToRoom()
+            }
+          }, 3000)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create WebSocket:', error)
+      status.value = 'CLOSED'
+    }
   }
 
-  const vote = (voteValue: string | number | null) => {
-    if (!isJoined.value || !wsConnection) {
+  const closeConnection = () => {
+    if (ws) {
+      ws.close(1000, 'User closed connection')
+      ws = null
+    }
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout)
+      reconnectTimeout = null
+    }
+    stopHeartbeat()
+    status.value = 'CLOSED'
+  }
+
+  const startHeartbeat = () => {
+    stopHeartbeat()
+    // Send ping every 25 seconds (server sends every 30)
+    heartbeatInterval = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }))
+      }
+    }, 25000)
+  }
+
+  const stopHeartbeat = () => {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval)
+      heartbeatInterval = null
+    }
+  }
+
+  // Computed properties
+  const myVote = computed(() => {
+    if (!currentUser.value) return null
+    const participant = roomState.value.participants.find(
+      p => p.id === userId
+    )
+    return participant?.vote || null
+  })
+
+  const votingComplete = computed(() => {
+    const activeParticipants = roomState.value.participants.filter(p => p.vote !== null)
+    return activeParticipants.length === roomState.value.participants.length &&
+           roomState.value.participants.length > 0
+  })
+
+  const averageVote = computed(() => {
+    if (!roomState.value.votesRevealed) return null
+
+    const numericVotes = roomState.value.participants
+      .map(p => p.vote)
+      .filter((vote): vote is number => typeof vote === 'number')
+
+    if (numericVotes.length === 0) return null
+
+    const sum = numericVotes.reduce((acc, vote) => acc + vote, 0)
+    return Math.round((sum / numericVotes.length) * 10) / 10
+  })
+
+  // Actions
+  const joinRoom = async (name: string) => {
+    if (!name.trim()) {
+      console.error('Name is required to join room')
+      return false
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not connected')
+      return false
+    }
+
+    try {
+      // Set up the current user
+      currentUser.value = {
+        id: userId,
+        name: name.trim()
+      }
+
+      // Save session for recovery
+      saveUserSession(userId, name.trim())
+
+      // Send join message via WebSocket
+      ws.send(JSON.stringify({
+        type: 'join',
+        name: name.trim()
+      }))
+
+      isJoined.value = true
+      return true
+    } catch (error) {
+      console.error('Failed to join room:', error)
+      return false
+    }
+  }
+
+  // Try to auto-rejoin if we have a saved session
+  const tryAutoRejoin = () => {
+    const session = getUserSession()
+    if (session && session.name) {
+      // Check if session is recent (within 24 hours)
+      const sessionAge = Date.now() - session.timestamp
+      if (sessionAge < 24 * 60 * 60 * 1000) {
+        return joinRoom(session.name)
+      } else {
+        // Clear old session
+        if (process.client) {
+          localStorage.removeItem(`poker-session-${roomId}`)
+        }
+      }
+    }
+    return false
+  }
+
+  const vote = async (voteValue: string | number | null) => {
+    if (!isJoined.value) {
       console.error('Must join room before voting')
       return false
     }
 
-    wsConnection.send(JSON.stringify({
-      type: 'vote',
-      vote: voteValue
-    }))
-    return true
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not connected')
+      return false
+    }
+
+    try {
+      ws.send(JSON.stringify({
+        type: 'vote',
+        vote: voteValue
+      }))
+
+      return true
+    } catch (error) {
+      console.error('Failed to vote:', error)
+      return false
+    }
   }
 
-  const revealVotes = () => {
-    if (!isJoined.value || !wsConnection) {
+  const revealVotes = async () => {
+    if (!isJoined.value) {
       console.error('Must join room before revealing votes')
       return false
     }
 
-    wsConnection.send(JSON.stringify({
-      type: 'reveal'
-    }))
-    return true
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not connected')
+      return false
+    }
+
+    try {
+      ws.send(JSON.stringify({
+        type: 'reveal'
+      }))
+
+      return true
+    } catch (error) {
+      console.error('Failed to reveal votes:', error)
+      return false
+    }
   }
 
-  const resetRound = () => {
-    if (!isJoined.value || !wsConnection) {
+  const resetRound = async () => {
+    if (!isJoined.value) {
       console.error('Must join room before resetting round')
       return false
     }
 
-    wsConnection.send(JSON.stringify({
-      type: 'reset'
-    }))
-    return true
-  }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not connected')
+      return false
+    }
 
-  const connectToRoom = () => {
-    if (wsConnection) {
-      status.value = 'CONNECTING'
-      wsConnection.open()
+    try {
+      ws.send(JSON.stringify({
+        type: 'reset'
+      }))
+
+      return true
+    } catch (error) {
+      console.error('Failed to reset round:', error)
+      return false
     }
   }
 
   const leaveRoom = () => {
-    if (wsConnection) {
-      wsConnection.close()
-    }
+    closeConnection()
     currentUser.value = null
     isJoined.value = false
-    status.value = 'CLOSED'
     roomState.value = {
       participants: [],
       votesRevealed: false,
       storyTitle: '',
     }
+    // Don't clear session on leave - keep it for potential rejoin
   }
+
+  // Clean up on component unmount
+  onUnmounted(() => {
+    closeConnection()
+  })
 
   return {
     // State
     roomState: readonly(roomState),
     currentUser: readonly(currentUser),
     isJoined: readonly(isJoined),
-    status, // WebSocket status from @vueuse/core
+    status,
 
     // Computed
     myVote,
@@ -229,6 +379,7 @@ export function usePokerRoom(roomId: string) {
     connectToRoom,
     leaveRoom,
     joinRoom,
+    tryAutoRejoin,
     vote,
     revealVotes,
     resetRound,

@@ -2,6 +2,12 @@ import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const MAX_MESSAGE_SIZE = 1024 * 10; // 10KB
 
+interface AuthMessage {
+  type: "auth";
+  roomId: string;
+  userId: string;
+}
+
 interface JoinMessage {
   type: "join";
   name: string;
@@ -20,32 +26,49 @@ interface ResetMessage {
   type: "reset";
 }
 
-type WebSocketMessage = JoinMessage | VoteMessage | RevealMessage | ResetMessage;
+interface PingMessage {
+  type: "ping";
+}
 
-// Extract room and user info from WebSocket protocol header
-// This follows the same pattern as the chat app for authentication
+interface PongMessage {
+  type: "pong";
+}
+
+type WebSocketMessage = AuthMessage | JoinMessage | VoteMessage | RevealMessage | ResetMessage | PingMessage | PongMessage;
+
+// Extract room and user info from WebSocket protocol header or URL
+// Temporary: fallback to dummy values for testing
 function extractRoomAndUser(request: Request): {
   room: string;
   userId: string;
 } {
-  const protocolHeader = request.headers.get("sec-websocket-protocol");
-  if (!protocolHeader) {
-    throw new Error("Missing sec-websocket-protocol header");
+  try {
+    const protocolHeader = request.headers.get("sec-websocket-protocol");
+    if (!protocolHeader) {
+      // Fallback for testing - extract from URL or use default
+      const url = new URL(request.url);
+      const room = url.searchParams.get('room') || 'test-room';
+      const userId = url.searchParams.get('userId') || `user-${Math.random().toString(36).substring(2, 9)}`;
+      return { room, userId };
+    }
+    const [encoded] = protocolHeader.split(",").map((x) => x.trim());
+    if (!encoded) {
+      throw new Error("Invalid sec-websocket-protocol format");
+    }
+    const decoded = Buffer.from(encoded, "base64").toString("utf-8");
+    const [room, userId] = decoded.split(":");
+    if (!room || !userId) {
+      throw new Error("Room and User ID must be separated by a colon");
+    }
+    return { room, userId };
+  } catch (error) {
+    console.log('Protocol extraction failed, using fallback:', error);
+    // Fallback for testing
+    return { 
+      room: 'test-room', 
+      userId: `user-${Math.random().toString(36).substring(2, 9)}` 
+    };
   }
-  const [encoded] = protocolHeader.split(",").map((x) => x.trim());
-  if (!encoded) {
-    throw new Error("Invalid sec-websocket-protocol format");
-  }
-  // Convert base64url back to base64 and decode
-  const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-  // Add padding if needed
-  const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
-  const decoded = atob(padded);
-  const [room, userId] = decoded.split(":");
-  if (!room || !userId) {
-    throw new Error("Room and User ID must be separated by a colon");
-  }
-  return { room, userId };
 }
 
 export default class Worker extends WorkerEntrypoint {
@@ -58,10 +81,20 @@ export default class Worker extends WorkerEntrypoint {
   }
 
   override async fetch(request: Request) {
+    console.log("Worker fetch called, URL:", request.url, "Upgrade:", request.headers.get("upgrade"));
+    
+    // Add a test endpoint
+    const url = new URL(request.url);
+    if (url.pathname === '/test') {
+      console.log("Test endpoint called");
+      return new Response("WebSocket worker is working!", { status: 200 });
+    }
+    
     const binding = (this.env as any)
       .POKER_ROOM as DurableObjectNamespace<PokerRoom>;
     try {
       const { room } = extractRoomAndUser(request);
+      console.log("Routing to room:", room);
       const stub = binding.get(binding.idFromName(room));
       return stub.fetch(request);
     } catch (err) {
@@ -72,6 +105,9 @@ export default class Worker extends WorkerEntrypoint {
 }
 
 export class PokerRoom extends DurableObject {
+  private authenticatedSockets = new Map<WebSocket, {room: string, userId: string}>();
+  private heartbeatIntervals = new Map<WebSocket, number>();
+
   async publish(room: string, data: any) {
     try {
       const websockets = this.ctx.getWebSockets();
@@ -79,8 +115,8 @@ export class PokerRoom extends DurableObject {
         return;
       }
       for (const ws of websockets) {
-        const state = ws.deserializeAttachment() || {};
-        if (state.room === room) {
+        const state = this.authenticatedSockets.get(ws);
+        if (state && state.room === room) {
           ws.send(JSON.stringify(data));
         }
       }
@@ -91,31 +127,23 @@ export class PokerRoom extends DurableObject {
   }
 
   override async fetch(request: Request): Promise<Response> {
+    console.log("PokerRoom fetch called, upgrade header:", request.headers.get("upgrade"));
     if (request.headers.get("upgrade") === "websocket") {
       try {
-        const { room, userId } = extractRoomAndUser(request);
-        const protocols =
-          request.headers
-            .get("sec-websocket-protocol")
-            ?.split(",")
-            .map((x) => x.trim()) || [];
-        protocols.shift(); // remove the room:userId from protocols
-
+        console.log("Creating WebSocket pair...");
+        // Create WebSocket pair
         const webSocketPair = new WebSocketPair();
         const [client, server] = Object.values(webSocketPair);
-        if (server) {
-          server.serializeAttachment({
-            room,
-            userId,
-          });
-          this.ctx.acceptWebSocket(server, [room, userId]);
-        }
+        
+        console.log("Accepting WebSocket...");
+        // Accept the WebSocket immediately - we'll handle auth via messages
+        this.ctx.acceptWebSocket(server);
+        console.log("WebSocket accepted successfully");
 
-        const res = new Response(null, { status: 101, webSocket: client });
-        if (protocols.length > 0) {
-          res.headers.set("sec-websocket-protocol", protocols[0] as string);
-        }
-        return res;
+        // Start heartbeat for this socket
+        this.startHeartbeat(server);
+
+        return new Response(null, { status: 101, webSocket: client });
       } catch (err) {
         console.error("Error in websocket fetch:", err);
         return new Response(null, { status: 400 });
@@ -128,8 +156,8 @@ export class PokerRoom extends DurableObject {
     ws: WebSocket,
     message: ArrayBuffer | string,
   ) {
-    const { room, userId } = ws.deserializeAttachment();
-
+    console.log("WebSocket message received:", typeof message, message);
+    
     // Validate message type and size
     if (typeof message !== "string") {
       console.error(`Invalid message type: ${typeof message}`);
@@ -144,6 +172,37 @@ export class PokerRoom extends DurableObject {
 
     try {
       const parsed = JSON.parse(message) as WebSocketMessage;
+      console.log("Parsed message:", parsed);
+      
+      // Handle authentication message
+      if (parsed.type === 'auth') {
+        console.log("Processing auth message...");
+        this.authenticatedSockets.set(ws, {
+          room: parsed.roomId,
+          userId: parsed.userId,
+        });
+        console.log(`WebSocket authenticated for room: ${parsed.roomId}, user: ${parsed.userId}`);
+        return;
+      }
+
+      // For other messages, get room and userId from our map
+      const socketState = this.authenticatedSockets.get(ws);
+      console.log("WebSocket state:", socketState);
+      if (!socketState) {
+        console.error("WebSocket not authenticated");
+        ws.close(1003, "Not authenticated");
+        return;
+      }
+
+      const { room, userId } = socketState;
+      console.log(`Processing message for room: ${room}, user: ${userId}`);
+      
+      // Handle ping/pong messages for heartbeat
+      if (parsed.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+        return;
+      }
+      
       await this.handleMessage(room, userId, parsed);
     } catch (err) {
       console.error("Message processing error:", err);
@@ -157,8 +216,19 @@ export class PokerRoom extends DurableObject {
     reason: string,
     _wasClean: boolean,
   ) {
-    const { room, userId } = ws.deserializeAttachment();
-    await this.handleDisconnect(room, userId);
+    const socketState = this.authenticatedSockets.get(ws);
+    if (socketState) {
+      const { room, userId } = socketState;
+      await this.handleDisconnect(room, userId);
+      this.authenticatedSockets.delete(ws);
+    }
+    
+    // Clean up heartbeat
+    const intervalId = this.heartbeatIntervals.get(ws);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.heartbeatIntervals.delete(ws);
+    }
   }
 
   private async handleMessage(room: string, userId: string, message: WebSocketMessage) {
@@ -189,9 +259,7 @@ export class PokerRoom extends DurableObject {
         // Reset the room for a new round of voting
         roomState.votesRevealed = false;
         for (const id in roomState.participants) {
-          if (roomState.participants[id]) {
-            roomState.participants[id].vote = null;
-          }
+          roomState.participants[id].vote = null;
         }
         break;
       }
@@ -227,8 +295,8 @@ export class PokerRoom extends DurableObject {
     const serializedMessage = JSON.stringify(message);
     for (const ws of websockets) {
       try {
-        const state = ws.deserializeAttachment() || {};
-        if (state.room === room) {
+        const state = this.authenticatedSockets.get(ws);
+        if (state && state.room === room) {
           ws.send(serializedMessage);
         }
       } catch (error) {
@@ -248,6 +316,24 @@ export class PokerRoom extends DurableObject {
 
   private async setRoomState(state: RoomStorage) {
     await this.ctx.storage.put('state', state);
+  }
+
+  private startHeartbeat(ws: WebSocket) {
+    // Send ping every 30 seconds to keep connection alive
+    const intervalId = setInterval(() => {
+      try {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      } catch (error) {
+        console.error("Failed to send ping:", error);
+        const intervalId = this.heartbeatIntervals.get(ws);
+        if (intervalId) {
+          clearInterval(intervalId);
+          this.heartbeatIntervals.delete(ws);
+        }
+      }
+    }, 30000);
+    
+    this.heartbeatIntervals.set(ws, intervalId);
   }
 }
 

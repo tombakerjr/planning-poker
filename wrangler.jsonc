@@ -1,9 +1,9 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "planning-poker",
-	"main": "./server/index.ts",
 	"compatibility_date": "2025-06-28",
 	"compatibility_flags": ["nodejs_compat"],
+	"main": "./worker.ts",
 	"assets": {
 		"binding": "ASSETS",
 		"directory": "./.output/public/"
@@ -18,8 +18,8 @@
 	},
 	"migrations": [
 		{
-			"tag": "v1",
-			"new_sqlite_classes": ["PokerRoom"]
+			"tag": "v3",
+			"new_classes": ["PokerRoom"]
 		}
 	],
 	"observability": {
