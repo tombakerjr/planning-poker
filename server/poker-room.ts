@@ -113,6 +113,7 @@ export class PokerRoom extends DurableObject {
   private sessions = new Map<WebSocket, WebSocketMeta>();
   private heartbeatIntervals = new Map<WebSocket, number>();
   private rateLimits = new Map<WebSocket, RateLimitInfo>();
+  private broadcastDebounceTimeout?: number;
 
   override async fetch(request: Request): Promise<Response> {
     // Handle WebSocket upgrade requests
@@ -308,14 +309,14 @@ export class PokerRoom extends DurableObject {
     }
 
     await this.setRoomState(roomState);
-    await this.broadcastState();
+    this.scheduleBroadcast();
   }
 
   private async handleDisconnect(userId: string) {
     const roomState = await this.getRoomState();
     delete roomState.participants[userId];
     await this.setRoomState(roomState);
-    await this.broadcastState();
+    this.scheduleBroadcast();
   }
 
   private serializeRoomState(roomState: RoomStorage) {
@@ -356,6 +357,16 @@ export class PokerRoom extends DurableObject {
         logger.error("Failed to send message to WebSocket:", error);
       }
     }
+  }
+
+  private scheduleBroadcast() {
+    if (this.broadcastDebounceTimeout) {
+      clearTimeout(this.broadcastDebounceTimeout);
+    }
+    this.broadcastDebounceTimeout = setTimeout(() => {
+      this.broadcastState();
+      this.broadcastDebounceTimeout = undefined;
+    }, 100) as unknown as number; // 100ms debounce
   }
 
   private async getRoomState(): Promise<RoomStorage> {
