@@ -31,6 +31,8 @@ export function usePokerRoom(roomId: string) {
   let ws: WebSocket | null = null
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
+  let reconnectAttempts = 0
+  const MAX_RECONNECT_ATTEMPTS = 10
 
   // Try to restore user session from localStorage
   const getUserSession = () => {
@@ -117,6 +119,7 @@ export function usePokerRoom(roomId: string) {
       ws.onopen = () => {
         console.log('WebSocket connection opened')
         status.value = 'OPEN'
+        reconnectAttempts = 0 // Reset reconnection counter on successful connection
 
         // Send authentication message
         if (ws) {
@@ -148,14 +151,24 @@ export function usePokerRoom(roomId: string) {
         status.value = 'CLOSED'
         stopHeartbeat()
 
-        // Attempt to reconnect after a delay
+        // Attempt to reconnect with exponential backoff
         if (event.code !== 1000) { // 1000 = normal closure
+          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            console.error('Max reconnection attempts reached. Please refresh the page.')
+            // TODO: Show user-friendly error message
+            return
+          }
+
+          // Exponential backoff: 1s, 2s, 4s, 8s, ... up to 30s
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
+          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+
           reconnectTimeout = setTimeout(() => {
             if (status.value === 'CLOSED') {
-              console.log('Attempting to reconnect...')
+              reconnectAttempts++
               connectToRoom()
             }
-          }, 3000)
+          }, delay)
         }
       }
     } catch (error) {
