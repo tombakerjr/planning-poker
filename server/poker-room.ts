@@ -1,6 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 
 const MAX_MESSAGE_SIZE = 1024 * 10; // 10KB
+const MAX_NAME_LENGTH = 50;
+const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 
 interface Participant {
   name: string;
@@ -97,6 +99,7 @@ export class PokerRoom extends DurableObject {
     if (!this.sessions.has(ws)) {
       const meta = ws.deserializeAttachment() as WebSocketMeta | null;
       if (meta) {
+        console.log(`Restored session for user ${meta.userId} after hibernation`);
         this.sessions.set(ws, meta);
       }
     }
@@ -184,8 +187,9 @@ export class PokerRoom extends DurableObject {
     switch (message.type) {
       case "join": {
         // Add a new participant to the room
+        const sanitizedName = message.name?.trim().substring(0, MAX_NAME_LENGTH);
         roomState.participants[userId] = {
-          name: message.name || `Guest-${userId.substring(0, 4)}`,
+          name: sanitizedName || `Guest-${userId.substring(0, 4)}`,
           vote: null,
         };
         break;
@@ -245,19 +249,21 @@ export class PokerRoom extends DurableObject {
     await this.broadcastState();
   }
 
-  private async sendRoomState(ws: WebSocket) {
-    const roomState = await this.getRoomState();
-    const participantsList = Object.entries(roomState.participants).map(
-      ([id, p]) => ({ id, ...p })
-    );
-
-    const message = {
+  private serializeRoomState(roomState: RoomStorage) {
+    return {
       type: "update",
       payload: {
         ...roomState,
-        participants: participantsList,
+        participants: Object.entries(roomState.participants).map(
+          ([id, p]) => ({ id, ...p })
+        ),
       },
     };
+  }
+
+  private async sendRoomState(ws: WebSocket) {
+    const roomState = await this.getRoomState();
+    const message = this.serializeRoomState(roomState);
 
     try {
       ws.send(JSON.stringify(message));
@@ -268,17 +274,7 @@ export class PokerRoom extends DurableObject {
 
   private async broadcastState() {
     const roomState = await this.getRoomState();
-    const participantsList = Object.entries(roomState.participants).map(
-      ([id, p]) => ({ id, ...p })
-    );
-
-    const message = {
-      type: "update",
-      payload: {
-        ...roomState,
-        participants: participantsList,
-      },
-    };
+    const message = this.serializeRoomState(roomState);
 
     const websockets = this.ctx.getWebSockets();
     if (websockets.length === 0) return;
@@ -298,7 +294,7 @@ export class PokerRoom extends DurableObject {
     return state || {
       participants: {},
       votesRevealed: false,
-      storyTitle: "As a user, I want to see my vote reflected in the UI.",
+      storyTitle: "",
     };
   }
 
@@ -310,7 +306,7 @@ export class PokerRoom extends DurableObject {
     // Clear any existing heartbeat for this WebSocket
     this.stopHeartbeat(ws);
 
-    // Send ping every 30 seconds to keep connection alive
+    // Send ping to keep connection alive
     const intervalId = setInterval(() => {
       try {
         ws.send(JSON.stringify({ type: "ping" }));
@@ -318,7 +314,7 @@ export class PokerRoom extends DurableObject {
         console.error("Failed to send ping:", error);
         this.stopHeartbeat(ws);
       }
-    }, 30000) as unknown as number;
+    }, HEARTBEAT_INTERVAL_MS) as unknown as number;
 
     this.heartbeatIntervals.set(ws, intervalId);
   }

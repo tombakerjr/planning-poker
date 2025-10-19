@@ -1,4 +1,5 @@
 import { ref, computed, readonly, onUnmounted } from 'vue'
+import { nanoid } from 'nanoid'
 
 export interface Participant {
   id: string
@@ -17,6 +18,11 @@ export interface RoomMessage {
   payload?: any
 }
 
+const MAX_RECONNECT_ATTEMPTS = 10
+const HEARTBEAT_INTERVAL_MS = 25000 // 25 seconds (less than server's 30s)
+const MAX_NAME_LENGTH = 50
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
+
 export function usePokerRoom(roomId: string) {
   const roomState = ref<RoomState>({
     participants: [],
@@ -32,7 +38,6 @@ export function usePokerRoom(roomId: string) {
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
   let reconnectAttempts = 0
-  const MAX_RECONNECT_ATTEMPTS = 10
 
   // Try to restore user session from localStorage
   const getUserSession = () => {
@@ -57,7 +62,7 @@ export function usePokerRoom(roomId: string) {
 
   // Generate or restore user ID
   const existingSession = getUserSession()
-  const userId = existingSession?.userId || `user-${roomId}-${Math.random().toString(36).substring(2, 9)}-${Date.now().toString(36)}`
+  const userId = existingSession?.userId || `user-${nanoid()}`
 
   console.log('Room ID:', roomId)
   console.log('User ID:', userId)
@@ -192,12 +197,12 @@ export function usePokerRoom(roomId: string) {
 
   const startHeartbeat = () => {
     stopHeartbeat()
-    // Send ping every 25 seconds (server sends every 30)
+    // Send ping to keep connection alive
     heartbeatInterval = setInterval(() => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'ping' }))
       }
-    }, 25000)
+    }, HEARTBEAT_INTERVAL_MS)
   }
 
   const stopHeartbeat = () => {
@@ -237,7 +242,9 @@ export function usePokerRoom(roomId: string) {
 
   // Actions
   const joinRoom = async (name: string) => {
-    if (!name.trim()) {
+    const trimmedName = name.trim().substring(0, MAX_NAME_LENGTH);
+
+    if (!trimmedName) {
       console.error('Name is required to join room')
       return false
     }
@@ -251,16 +258,16 @@ export function usePokerRoom(roomId: string) {
       // Set up the current user
       currentUser.value = {
         id: userId,
-        name: name.trim()
+        name: trimmedName
       }
 
       // Save session for recovery
-      saveUserSession(userId, name.trim())
+      saveUserSession(userId, trimmedName)
 
       // Send join message via WebSocket
       ws.send(JSON.stringify({
         type: 'join',
-        name: name.trim()
+        name: trimmedName
       }))
 
       isJoined.value = true
@@ -274,10 +281,10 @@ export function usePokerRoom(roomId: string) {
   // Try to auto-rejoin if we have a saved session
   const tryAutoRejoin = () => {
     const session = getUserSession()
-    if (session && session.name) {
-      // Check if session is recent (within 24 hours)
+    if (session && session.name && session.timestamp) {
+      // Check if session is recent
       const sessionAge = Date.now() - session.timestamp
-      if (sessionAge < 24 * 60 * 60 * 1000) {
+      if (sessionAge < SESSION_EXPIRY_MS) {
         return joinRoom(session.name)
       } else {
         // Clear old session
