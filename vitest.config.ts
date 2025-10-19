@@ -11,5 +11,10 @@ export default defineWorkersConfig({
         },
       },
     },
+    // NOTE: Coverage is currently not fully supported with Workers Vitest pool
+    // V8 coverage requires node:inspector which is not available in workerd
+    // Istanbul coverage is the recommended approach but requires additional setup
+    // See: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#coverage
+    // For now, we rely on comprehensive manual testing and will revisit with Istanbul
   },
 });

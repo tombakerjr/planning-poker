@@ -1,6 +1,10 @@
 <script setup lang="ts">
-// Inject the poker room state and actions
-const pokerRoom = inject('pokerRoom') as any
+import { PokerRoomKey } from '~/composables/usePokerRoom'
+
+// Inject the poker room state and actions with type safety
+const pokerRoom = inject(PokerRoomKey)
+if (!pokerRoom) throw new Error('PokerRoom not provided')
+
 const { roomState, revealVotes, resetRound, isJoined, votingComplete, isLoading, status } = pokerRoom
 </script>
 

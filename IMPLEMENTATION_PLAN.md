@@ -1,558 +1,1362 @@
-# Planning Poker - Post-Migration Improvement Plan
+# Planning Poker - Incremental Improvement Plan
 
-## Context
+## Status: Active Development
+**Last Updated:** 2025-10-19
 
-This plan addresses issues identified in the Claude Code review after successfully migrating to a single-worker architecture with WebSocket Hibernation API. The migration is complete and deployed, but several critical bugs and improvements need to be addressed.
+This plan outlines incremental improvements to enhance security, reliability, performance, and user experience while maintaining high quality throughout development.
+
+---
+
+## Current State
+
+**Completed:**
+- ✅ Single-worker architecture with WebSocket Hibernation API
+- ✅ Durable Objects with proper state management
+- ✅ Real-time voting functionality
+- ✅ Basic rate limiting (room creation)
+- ✅ Input validation and sanitization
+- ✅ Session persistence and recovery
+- ✅ Reconnection with exponential backoff
+- ✅ Error handling and user feedback
+- ✅ Toast notification system
+- ✅ Connection status indicators
+- ✅ Loading states for actions
+- ✅ Basic test coverage (11 tests passing)
+- ✅ Production deployment at https://planning-poker.tombaker.workers.dev
+
+**Current Gaps:**
+- ❌ Console.log statements in production code (29 occurrences)
+- ❌ Type safety issues (2 `as any` usages)
+- ❌ Limited test coverage (no coverage reporting)
+- ❌ No E2E tests
+- ❌ No performance monitoring
+- ❌ Basic feature set (missing advanced features)
+
+---
+
+## Phase 1: Code Quality & Testing Foundation
+
+**Priority:** HIGH
+**Timeline:** 2-3 days
+**Status:** In Progress
+
+### 1.1 Clean Up Console Logging ✅
+
+**Goal:** Replace all console.log statements with proper logging utility
+
+**Status:** COMPLETED (2025-10-19)
+
+**Implementation Summary:**
+- Replaced all console.log/debug/info/warn/error statements in source files
+- Updated 4 files:
+  - `composables/usePokerRoom.ts` - 17 occurrences
+  - `components/VotingArea.vue` - 1 occurrence
+  - `pages/index.vue` - 1 occurrence
+  - `server/poker-room.ts` - Already using inline logger (correct)
+- All logging now uses centralized logger utility
+- Environment-based log levels (DEBUG in dev, WARN in prod)
+
+**Files Modified:**
+- `composables/usePokerRoom.ts:4` - Added logger import
+- `components/VotingArea.vue:2` - Added logger import
+- `pages/index.vue:2` - Added logger import
+
+**Success Criteria:**
+- [x] Zero console.log statements in production code
+- [x] All logging uses centralized logger utility
+- [x] Log levels properly configured by environment
+- [x] Structured logs for Cloudflare Analytics
+
+**Actual Time:** 30 minutes
+
+---
+
+### 1.2 Fix Type Safety Issues ✅
+
+**Goal:** Eliminate `as any` type assertions and improve type safety
+
+**Status:** COMPLETED (2025-10-19)
+
+**Implementation Summary:**
+- Implemented Option A (Injection Key) for type-safe provide/inject
+- Created `PokerRoomKey` injection key in `composables/usePokerRoom.ts`
+- Updated parent component to provide with type safety
+- Updated child components to inject with type safety
+- Added runtime validation (throw if not provided)
+
+**Files Modified:**
+- `composables/usePokerRoom.ts:1` - Added InjectionKey import
+- `composables/usePokerRoom.ts:461-462` - Exported PokerRoomComposable type and PokerRoomKey
+- `pages/room/[id].vue:2` - Imported PokerRoomKey
+- `pages/room/[id].vue:11` - Added provide(PokerRoomKey, pokerRoom)
+- `components/VotingArea.vue:3` - Imported PokerRoomKey
+- `components/VotingArea.vue:8-9` - Type-safe inject with validation
+- `components/ParticipantList.vue:2` - Imported PokerRoomKey
+- `components/ParticipantList.vue:5-6` - Type-safe inject with validation
+
+**Success Criteria:**
+- [x] No `as any` type assertions
+- [x] Proper TypeScript inference throughout
+- [x] Type-safe injection/provide pattern
+- [x] No type-related warnings in build
+
+**Actual Time:** 20 minutes
+
+---
+
+### 1.3 Test Coverage Configuration 📝
+
+**Goal:** Configure test coverage reporting for future expansion
+
+**Status:** DOCUMENTED (2025-10-19)
 
 **Current State:**
-- ✅ Single worker architecture with WebSocket Hibernation
-- ✅ Durable Objects properly configured
-- ✅ Basic real-time voting functionality working
-- ✅ Deployed to production at https://planning-poker.tombaker.workers.dev
-- ❌ Several critical bugs need fixing (see below)
-- ❌ Missing security measures (rate limiting, input validation)
-- ❌ No test coverage
+- 11 tests passing (2 test files)
+- @vitest/coverage-v8 installed
+- **KNOWN ISSUE**: V8 coverage not supported in Workers Vitest pool
+
+**Coverage Limitation:**
+Cloudflare Workers Vitest pool does not support V8 coverage due to missing `node:inspector` module in workerd runtime. The recommended approach is Istanbul instrumented coverage, which requires additional setup.
+
+**Documentation:**
+- Added note in `vitest.config.ts` explaining the limitation
+- Reference: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#coverage
+- Added `coverage/` to `.gitignore`
+
+**Future Work:**
+- Implement Istanbul coverage (Phase 1.3b)
+- Or rely on comprehensive manual testing and E2E tests
+- Current approach: Maintain 11 passing tests and expand with E2E
+
+**Implementation Summary:**
+```bash
+pnpm add -D @vitest/coverage-v8  # Installed but not configured
+```
+
+**Step 2: Create Test Files**
+
+**`composables/useToast.test.ts`**
+```typescript
+describe('useToast', () => {
+  it('should add toast notification', () => {})
+  it('should auto-dismiss after duration', () => {})
+  it('should manually dismiss toast', () => {})
+  it('should clear timer on manual dismiss', () => {})
+  it('should handle multiple toasts', () => {})
+})
+```
+
+**`composables/usePokerRoom.test.ts`**
+```typescript
+describe('usePokerRoom', () => {
+  describe('Connection Management', () => {
+    it('should connect to WebSocket', () => {})
+    it('should handle reconnection with backoff', () => {})
+    it('should stop reconnection after max attempts', () => {})
+    it('should clean up on unmount', () => {})
+  })
+
+  describe('Room Actions', () => {
+    it('should join room with valid name', () => {})
+    it('should validate name before joining', () => {})
+    it('should submit vote', () => {})
+    it('should reveal votes', () => {})
+    it('should reset round', () => {})
+  })
+
+  describe('Error Handling', () => {
+    it('should show toast on connection error', () => {})
+    it('should show toast on action failure', () => {})
+  })
+})
+```
+
+**`components/ToastContainer.test.ts`**
+```typescript
+describe('ToastContainer', () => {
+  it('should render toasts', () => {})
+  it('should apply correct color classes', () => {})
+  it('should handle toast removal', () => {})
+  it('should animate transitions', () => {})
+})
+```
+
+**Step 3: Expand Durable Object Tests**
+
+Add to `server/poker-room.test.ts`:
+- WebSocket message handling tests
+- Session persistence across hibernation
+- Rate limiting enforcement
+- Heartbeat cleanup
+- Broadcast debouncing
+
+**Success Criteria:**
+- [ ] @vitest/coverage-v8 installed
+- [ ] Coverage reporting working: `pnpm test:coverage`
+- [ ] >80% code coverage achieved
+- [ ] All critical paths tested
+- [ ] Component tests for all Vue components
+- [ ] Composable tests for all composables
+
+**Estimated Time:** 1 day
 
 ---
 
-## 🔴 Phase 1: Critical Fixes (Must Fix - Production Blockers)
+### 1.4 Add E2E Testing ⏳
 
-**Priority:** Immediate
-**Estimated Time:** 2 hours
+**Goal:** Set up end-to-end testing for critical user flows
+
+**Technology:** Playwright (recommended for Cloudflare Workers)
+
+**Implementation:**
+
+**Step 1: Install Playwright**
+```bash
+pnpm add -D @playwright/test
+npx playwright install
+```
+
+**Step 2: Configure Playwright**
+
+**`playwright.config.ts`**
+```typescript
+import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  use: {
+    baseURL: 'http://localhost:3000',
+  },
+  webServer: {
+    command: 'pnpm dev',
+    port: 3000,
+    reuseExistingServer: !process.env.CI,
+  },
+})
+```
+
+**Step 3: Create E2E Tests**
+
+**`tests/e2e/room-flow.spec.ts`**
+```typescript
+test('complete voting flow', async ({ page, context }) => {
+  // User 1: Create room
+  await page.goto('/')
+  await page.click('text=Create Room')
+  const roomUrl = await page.url()
+
+  // User 1: Join room
+  await page.fill('input[name="name"]', 'Alice')
+  await page.click('text=Join Room')
+
+  // User 2: Join same room
+  const page2 = await context.newPage()
+  await page2.goto(roomUrl)
+  await page2.fill('input[name="name"]', 'Bob')
+  await page2.click('text=Join Room')
+
+  // Both users vote
+  await page.click('text=5')
+  await page2.click('text=8')
+
+  // User 1 reveals votes
+  await page.click('text=Reveal Votes')
+
+  // Verify votes are visible
+  await expect(page.locator('text=5')).toBeVisible()
+  await expect(page.locator('text=8')).toBeVisible()
+
+  // Reset round
+  await page.click('text=New Round')
+
+  // Verify votes cleared
+  await expect(page.locator('text=5')).not.toBeVisible()
+})
+
+test('reconnection after disconnect', async ({ page }) => {
+  // ... test reconnection logic
+})
+
+test('error handling for invalid actions', async ({ page }) => {
+  // ... test error scenarios
+})
+```
+
+**Success Criteria:**
+- [ ] Playwright installed and configured
+- [ ] E2E tests for critical user flows
+- [ ] Tests run in CI pipeline
+- [ ] Tests cover multi-user scenarios
+- [ ] Reconnection scenarios tested
+
+**Estimated Time:** 1 day
+
+---
+
+## Phase 2: Performance & Monitoring
+
+**Priority:** HIGH
+**Timeline:** 1-2 days
 **Status:** Pending
 
-### 1.1 Memory Leak in Heartbeat Implementation
-**File:** `server/poker-room.ts:278-291`
-**Severity:** High
+### 2.1 Add Performance Metrics ⏳
 
-**Problem:**
-- Heartbeat intervals never cleared on disconnect
-- Multiple calls create multiple intervals
-- Leads to memory leak in Durable Object
+**Goal:** Track and monitor application performance
 
-**Fix:**
-```typescript
-private heartbeatIntervals = new Map<WebSocket, number>();
+**Metrics to Track:**
+1. **WebSocket Performance**
+   - Connection establishment time
+   - Message round-trip latency
+   - Broadcast time for N participants
+   - Reconnection time
 
-private startHeartbeat(ws: WebSocket) {
-  this.stopHeartbeat(ws);
-  const intervalId = setInterval(() => {
-    try {
-      ws.send(JSON.stringify({ type: "ping" }));
-    } catch (error) {
-      console.error("Failed to send ping:", error);
-      this.stopHeartbeat(ws);
-    }
-  }, 30000) as unknown as number;
-  this.heartbeatIntervals.set(ws, intervalId);
-}
+2. **Durable Object Performance**
+   - CPU time per request
+   - Active duration (GB-seconds)
+   - Storage operations time
+   - Broadcast debounce effectiveness
 
-private stopHeartbeat(ws: WebSocket) {
-  const intervalId = this.heartbeatIntervals.get(ws);
-  if (intervalId) {
-    clearInterval(intervalId);
-    this.heartbeatIntervals.delete(ws);
-  }
-}
+3. **User Experience Metrics**
+   - Time to first vote
+   - Time to reveal votes
+   - Page load time
+   - Interactive time
 
-override async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
-  this.stopHeartbeat(ws);
-  // ... rest of implementation
-}
-```
+**Implementation:**
 
-**Success Criteria:**
-- [ ] Heartbeat intervals properly cleaned up on disconnect
-- [ ] No interval leaks when testing multiple connect/disconnect cycles
-- [ ] Memory usage stable during stress testing
-
----
-
-### 1.2 Race Condition in Authentication Flow
-**File:** `server/poker-room.ts:112-124`
-**Severity:** High
-
-**Problem:**
-- Sessions Map lost on Durable Object hibernation
-- `serializeAttachment()` data persists but not read back
-- Users lose session on wake-up
-
-**Fix:**
-```typescript
-override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
-  // Restore session from attachment if not in memory
-  if (!this.sessions.has(ws)) {
-    const meta = ws.deserializeAttachment() as WebSocketMeta | null;
-    if (meta) {
-      this.sessions.set(ws, meta);
-    }
-  }
-
-  // ... rest of implementation
-}
-```
-
-**Success Criteria:**
-- [ ] Sessions persist across Durable Object hibernation
-- [ ] Users don't lose connection after idle period
-- [ ] Test hibernation with `wrangler dev` after inactivity
-
----
-
-### 1.3 Auto-Reconnect Infinite Loop
-**File:** `composables/usePokerRoom.ts:150-164`
-**Severity:** High
-
-**Problem:**
-- No maximum retry count
-- No exponential backoff
-- Will retry forever even if server permanently unavailable
-
-**Fix:**
-```typescript
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 10;
-
-const scheduleReconnect = () => {
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.error('Max reconnection attempts reached');
-    // TODO: Show user-friendly error message
-    return;
-  }
-
-  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-  reconnectTimeout = setTimeout(() => {
-    reconnectAttempts++;
-    connectToRoom();
-  }, delay);
-};
-
-ws.onopen = () => {
-  reconnectAttempts = 0; // Reset on successful connection
-  status.value = 'OPEN';
-  // ... rest of onopen handler
-};
-
-ws.onclose = (event) => {
-  status.value = 'CLOSED';
-  if (event.code !== 1000) {
-    scheduleReconnect();
-  }
-};
-```
-
-**Success Criteria:**
-- [ ] Reconnection stops after 10 attempts
-- [ ] Exponential backoff prevents server hammering
-- [ ] User sees error message when max retries reached
-
----
-
-### 1.4 Missing Error Handling in Room Operations
-**File:** `server/poker-room.ts:169-208`
-**Severity:** High
-
-**Problem:**
-- Operations silently fail if user hasn't joined
-- No validation before state mutations
-- Confusing user experience
-
-**Fix:**
-```typescript
-case "vote": {
-  if (!roomState.participants[userId]) {
-    ws.send(JSON.stringify({
-      type: "error",
-      payload: { message: "Must join room before voting" }
-    }));
-    return;
-  }
-  roomState.participants[userId].vote = message.vote;
-  break;
-}
-
-case "reveal": {
-  if (!roomState.participants[userId]) {
-    ws.send(JSON.stringify({
-      type: "error",
-      payload: { message: "Must join room before revealing votes" }
-    }));
-    return;
-  }
-  roomState.votesRevealed = true;
-  break;
-}
-
-case "reset": {
-  if (!roomState.participants[userId]) {
-    ws.send(JSON.stringify({
-      type: "error",
-      payload: { message: "Must join room before resetting" }
-    }));
-    return;
-  }
-  // ... rest of reset logic
-}
-```
-
-**Client-side error handling:**
+**Add Performance Tracking to Composable**
 ```typescript
 // In composables/usePokerRoom.ts
-const handleMessage = (data: any) => {
-  if (data.type === 'error') {
-    // TODO: Show toast notification or error banner
-    console.error('Server error:', data.payload.message);
-    return;
+const metrics = {
+  connectionStartTime: 0,
+  messageLatency: [] as number[],
+  reconnectionCount: 0,
+}
+
+// Track connection time
+const connectToRoom = () => {
+  metrics.connectionStartTime = performance.now()
+  // ... existing code
+
+  ws.onopen = () => {
+    const connectionTime = performance.now() - metrics.connectionStartTime
+    logger.info('Connection established', { connectionTime })
+    // ... existing code
   }
-  // ... rest of message handling
+}
+
+// Track message latency
+const vote = async (value) => {
+  const startTime = performance.now()
+  // ... send message
+
+  // On acknowledgment (add new message type)
+  const latency = performance.now() - startTime
+  metrics.messageLatency.push(latency)
+}
+```
+
+**Add Cloudflare Analytics Integration**
+```typescript
+// Send custom metrics to Cloudflare Analytics
+interface AnalyticsEvent {
+  metric: string
+  value: number
+  timestamp: number
+  metadata?: Record<string, any>
+}
+
+const sendAnalytics = (event: AnalyticsEvent) => {
+  if (process.client && 'sendBeacon' in navigator) {
+    navigator.sendBeacon('/api/analytics', JSON.stringify(event))
+  }
 }
 ```
 
 **Success Criteria:**
-- [ ] All operations validate user joined
-- [ ] Error messages sent to client
-- [ ] User sees helpful error feedback
+- [ ] Performance metrics tracked client-side
+- [ ] Metrics sent to Cloudflare Analytics
+- [ ] Dashboard created for visualization
+- [ ] Alerts configured for performance degradation
+- [ ] Latency p99 < 100ms
+
+**Estimated Time:** 4 hours
 
 ---
 
-## ⚠️ Phase 2: High Priority Fixes (Should Fix Soon)
+### 2.2 Optimize State Management ⏳
 
-**Priority:** This Week
-**Estimated Time:** 1 hour
-**Status:** Pending
+**Goal:** Reduce bandwidth and improve performance for large rooms
 
-### 2.1 Remove Unused WebSocket Endpoint
-**File:** `server/api/room/[id]/ws.get.ts`
-**Severity:** Medium
+**Current Issue:** Full state broadcast on every change
 
-**Problem:**
-- Entire file bypassed by `worker.ts:14-25`
-- Confusing for future developers
-- Dead code in repository
+**Optimizations:**
 
-**Fix:** Delete the file entirely
-
-**Success Criteria:**
-- [ ] File removed from repository
-- [ ] WebSocket connections still work via worker.ts
-- [ ] No dead code warnings
-
----
-
-### 2.2 Fix LocalStorage Session Age Bug
-**File:** `composables/usePokerRoom.ts:44-56`
-**Severity:** Medium
-
-**Problem:**
-- Missing null check on `session.timestamp`
-- Could cause `NaN` comparisons
-
-**Fix:**
+**1. Implement Delta Updates**
 ```typescript
-if (session.timestamp && (Date.now() - session.timestamp) < 24 * 60 * 60 * 1000) {
-  userId = session.userId;
+// Instead of sending full state:
+{
+  type: 'update',
+  payload: { participants: [...], votesRevealed: false, ... }
+}
+
+// Send only changes:
+{
+  type: 'delta',
+  payload: {
+    changes: [
+      { type: 'participant_vote', userId: 'user-123', vote: 5 }
+    ]
+  }
 }
 ```
 
-**Success Criteria:**
-- [ ] No NaN comparisons
-- [ ] Sessions properly expire after 24 hours
-- [ ] Test with missing timestamp field
-
----
-
-### 2.3 Add Input Validation
-**Files:** `server/poker-room.ts:176`, `composables/usePokerRoom.ts:133`
-**Severity:** Medium
-
-**Problem:**
-- No length limits on names (could accept megabytes)
-- No sanitization
-- No character validation
-
-**Fix:**
+**2. Add Message Compression**
 ```typescript
-// server/poker-room.ts
-const MAX_NAME_LENGTH = 50;
-const sanitizedName = message.name?.trim().substring(0, MAX_NAME_LENGTH);
-name: sanitizedName || `Guest-${userId.substring(0, 4)}`,
+// For rooms with >20 participants, compress state
+private async broadcastState() {
+  const state = await this.getRoomState()
+  const message = this.serializeRoomState(state)
 
-// composables/usePokerRoom.ts
-const joinRoom = async (name: string) => {
-  const trimmedName = name.trim().substring(0, 50);
-  if (!trimmedName) {
-    // TODO: Show error to user
-    return;
+  let payload = JSON.stringify(message)
+
+  // Compress for large payloads
+  if (payload.length > 1024) {
+    payload = await compress(payload)
   }
-  ws?.send(JSON.stringify({
-    type: 'join',
-    name: trimmedName
-  }));
-};
+
+  this.ctx.getWebSockets().forEach(ws => ws.send(payload))
+}
 ```
 
-**Success Criteria:**
-- [ ] Names limited to 50 characters
-- [ ] Empty names rejected with error message
-- [ ] Whitespace trimmed automatically
-
----
-
-### 2.4 Fix Default Story Title
-**File:** `server/poker-room.ts:270`
-**Severity:** Low (but user-facing)
-
-**Problem:**
-- Shows internal test story: "As a user, I want to see my vote reflected in the UI."
-- Confusing to users
-
-**Fix:**
+**3. Optimize Participant Rendering**
 ```typescript
-storyTitle: "",
+// Add virtual scrolling for 50+ participants
+<RecycleScroller
+  :items="roomState.participants"
+  :item-size="60"
+  key-field="id"
+>
+  <template #default="{ item }">
+    <ParticipantCard :participant="item" />
+  </template>
+</RecycleScroller>
 ```
 
 **Success Criteria:**
-- [ ] Default story title is empty
-- [ ] Users can set their own story title
-- [ ] No internal test data visible
+- [ ] Delta updates implemented and tested
+- [ ] Bandwidth reduced by >50% for large rooms
+- [ ] Virtual scrolling for participant list
+- [ ] Performance maintained with 100+ participants
+- [ ] Compression working for large payloads
+
+**Estimated Time:** 4 hours
 
 ---
 
-## 🟡 Phase 3: Security & Polish (Post-Launch)
+### 2.3 Add Health Check Endpoint ⏳
 
-**Priority:** Next Week
-**Estimated Time:** 3 hours
-**Status:** Pending
-
-### 3.1 Add Rate Limiting
-**Severity:** Medium (Security)
+**Goal:** Monitor application health and readiness
 
 **Implementation:**
-- Message flood protection (max 10 messages/second per connection)
-- Room creation rate limiting (max 5 rooms/minute per IP)
-- Connection throttling (max 100 concurrent connections per Durable Object)
 
-**Files to Create:**
-- `server/middleware/ratelimit.ts`
-
-**Success Criteria:**
-- [ ] Message flooding blocked
-- [ ] Room creation spam prevented
-- [ ] Durable Object protected from overload
-
----
-
-### 3.2 Replace Console.log with Proper Logging
-**Files:** Multiple (`composables/usePokerRoom.ts`, `server/poker-room.ts`)
-**Severity:** Low
-
-**Implementation:**
-- Create logging utility with levels (debug, info, warn, error)
-- Environment-aware logging (verbose in dev, quiet in prod)
-- Structured logging for better observability
-
-**Success Criteria:**
-- [ ] No console.log in production
-- [ ] Structured logs for debugging
-- [ ] Log levels configurable by environment
-
----
-
-### 3.3 Documentation Cleanup
-**Files:** `DEPLOYMENT.md`, `DEPLOYMENT_WORKERS.md`, `MIGRATION_COMPLETE.md`
-**Severity:** Low
-
-**Problem:**
-- Empty documentation files (0 bytes)
-- Confusing for new developers
-
-**Fix:**
-- Delete empty files
-- Update README.md with current architecture
-- Document WebSocket message protocol
-
-**Success Criteria:**
-- [ ] No empty documentation files
-- [ ] README reflects current architecture
-- [ ] Message protocol documented
-
----
-
-### 3.4 Improve User ID Generation
-**File:** `composables/usePokerRoom.ts:57`
-**Severity:** Low (Security)
-
-**Problem:**
-- Using Math.random() for user IDs
-- Low entropy, potential collisions
-
-**Fix:**
+**`server/api/health.get.ts`**
 ```typescript
-import { nanoid } from 'nanoid';
+export default defineEventHandler(async (event) => {
+  const health = {
+    status: 'healthy',
+    timestamp: Date.now(),
+    version: process.env.npm_package_version,
+    environment: process.env.NODE_ENV,
+    checks: {
+      database: 'healthy',
+      durableObjects: 'healthy',
+      websockets: 'healthy',
+    },
+    metrics: {
+      uptime: process.uptime?.() || 0,
+      memory: process.memoryUsage?.() || {},
+    }
+  }
 
-const userId = existingSession?.userId || `user-${nanoid()}`;
+  // Check Durable Object availability
+  try {
+    const testRoom = env.POKER_ROOM.newUniqueId()
+    const stub = env.POKER_ROOM.get(testRoom)
+    // Basic connectivity check (don't actually create room)
+    health.checks.durableObjects = 'healthy'
+  } catch (error) {
+    health.checks.durableObjects = 'unhealthy'
+    health.status = 'degraded'
+  }
+
+  return health
+})
 ```
 
-**Success Criteria:**
-- [ ] Using nanoid for user IDs
-- [ ] No ID collisions in testing
-- [ ] Better security through randomness
+**Add Metrics Endpoint**
 
----
-
-## 🔵 Phase 4: Long-term Improvements (Future)
-
-**Priority:** Future Iterations
-**Estimated Time:** 8+ hours
-**Status:** Backlog
-
-### 4.1 Add Comprehensive Test Coverage
-**Current State:** No tests
-
-**Test Files to Create:**
-- `server/poker-room.test.ts` - Durable Object unit tests
-- `composables/usePokerRoom.test.ts` - Composable tests
-- `tests/e2e/websocket-flow.spec.ts` - End-to-end WebSocket flow
-
-**Test Scenarios:**
-- Room creation and joining
-- Voting flow with multiple users
-- Reveal and reset functionality
-- Connection/disconnection handling
-- Error scenarios
-- Hibernation and wake-up
-
-**Success Criteria:**
-- [ ] >80% code coverage
-- [ ] All critical paths tested
-- [ ] E2E tests passing in CI
-
----
-
-### 4.2 Performance Optimizations
-
-**4.2.1 Extract Duplicate State Serialization**
-**File:** `server/poker-room.ts:217-263`
-
-**Problem:** Duplicate code in `sendRoomState()` and `broadcastState()`
-
-**Fix:**
+**`server/api/metrics.get.ts`**
 ```typescript
-private serializeRoomState(roomState: RoomStorage) {
+export default defineEventHandler(async () => {
   return {
-    ...roomState,
-    participants: Object.entries(roomState.participants).map(
-      ([id, p]) => ({ id, ...p })
-    ),
-  };
+    activeConnections: getActiveConnectionCount(),
+    roomCount: getRoomCount(),
+    messageCount: getMessageCount(),
+    errorRate: getErrorRate(),
+  }
+})
+```
+
+**Success Criteria:**
+- [ ] `/api/health` endpoint returns health status
+- [ ] `/api/metrics` endpoint returns key metrics
+- [ ] Health checks run on all critical systems
+- [ ] Monitoring dashboard configured
+- [ ] Alerts set up for unhealthy status
+
+**Estimated Time:** 2 hours
+
+---
+
+## Phase 3: Enhanced Security
+
+**Priority:** MEDIUM
+**Timeline:** 1-2 days
+**Status:** Pending
+
+### 3.1 WebSocket Security ⏳
+
+**Goal:** Enhance WebSocket connection security
+
+**Implementation:**
+
+**1. Origin Validation**
+```typescript
+// In worker.ts
+private async handleWebSocketUpgrade(request: Request): Promise<Response> {
+  const origin = request.headers.get('Origin')
+  const allowedOrigins = [
+    'https://planning-poker.tombaker.workers.dev',
+    'http://localhost:3000', // Dev only
+  ]
+
+  if (origin && !allowedOrigins.includes(origin)) {
+    return new Response('Forbidden', { status: 403 })
+  }
+
+  // ... existing WebSocket upgrade code
 }
 ```
 
+**2. CSRF Token for WebSocket Upgrades**
+```typescript
+// Generate token on page load
+const csrfToken = generateToken()
+sessionStorage.setItem('csrf-token', csrfToken)
+
+// Include in WebSocket URL
+const wsUrl = `${protocol}//${host}/api/room/${roomId}/ws?csrf=${csrfToken}`
+
+// Validate on server
+const url = new URL(request.url)
+const token = url.searchParams.get('csrf')
+if (!validateCsrfToken(token)) {
+  return new Response('Invalid CSRF token', { status: 403 })
+}
+```
+
+**3. Message Signing**
+```typescript
+// Sign messages to prevent tampering
+interface SignedMessage {
+  type: string
+  payload: any
+  signature: string
+  timestamp: number
+}
+
+const signMessage = (msg: any, secret: string) => {
+  const payload = JSON.stringify({ ...msg, timestamp: Date.now() })
+  const signature = createHmac('sha256', secret).update(payload).digest('hex')
+  return { ...msg, signature, timestamp: Date.now() }
+}
+```
+
+**Success Criteria:**
+- [ ] Origin validation for all WebSocket connections
+- [ ] CSRF tokens validated on upgrade
+- [ ] Message signing implemented (optional)
+- [ ] Security audit passed
+- [ ] No unauthorized connections possible
+
+**Estimated Time:** 4 hours
+
 ---
 
-**4.2.2 Add Broadcast Debouncing**
+### 3.2 Room Access Control ⏳
 
-**Problem:** Multiple rapid state changes cause excessive broadcasts
+**Goal:** Add optional password protection and moderation
 
-**Fix:** Debounce broadcast with 100ms delay
+**Implementation:**
+
+**1. Room Passwords**
+```typescript
+// Add password field to room creation
+interface RoomConfig {
+  roomId: string
+  password?: string
+  createdBy: string
+  createdAt: number
+}
+
+// Hash password before storage
+const hashedPassword = await hashPassword(password)
+
+// Verify on join
+const verifyRoomPassword = async (roomId: string, password: string) => {
+  const room = await getRoomConfig(roomId)
+  if (!room.password) return true
+  return await verifyPassword(password, room.password)
+}
+```
+
+**2. Moderator Role**
+```typescript
+interface Participant {
+  id: string
+  name: string
+  vote: string | number | null
+  role: 'moderator' | 'participant'
+  joinedAt: number
+}
+
+// Moderator actions
+const moderatorActions = {
+  kickUser: (userId: string) => {},
+  lockRoom: () => {},
+  unlockRoom: () => {},
+  clearVotes: () => {},
+}
+```
+
+**3. Room Ownership**
+```typescript
+// First user to join becomes owner/moderator
+const handleJoin = (userId: string) => {
+  const participants = Object.keys(roomState.participants)
+  const role = participants.length === 0 ? 'moderator' : 'participant'
+
+  roomState.participants[userId] = {
+    name,
+    vote: null,
+    role,
+    joinedAt: Date.now(),
+  }
+}
+```
+
+**Success Criteria:**
+- [ ] Optional password protection working
+- [ ] Moderator role with special permissions
+- [ ] Room owner can kick/ban users
+- [ ] Room locking prevents new joins
+- [ ] UI shows moderator controls
+
+**Estimated Time:** 4 hours
 
 ---
 
-### 4.3 Enhanced Features
+### 3.3 Improve Rate Limiting ⏳
 
-**Features from Original Plan (Still Relevant):**
-- User name input modal (Phase 3 from old plan)
-- Connection status indicators
-- Room controls (reveal/reset buttons with better UI)
-- Loading states throughout app
-- Error toast notifications
+**Goal:** Move rate limiting to Cloudflare KV for distributed enforcement
 
-**New Feature Ideas:**
-- Room expiration (auto-delete after 24 hours of inactivity)
-- Room access control (optional passwords)
-- Maximum participant limits (prevent abuse)
-- Story title editing
-- Vote statistics (average, median, etc.)
-- Export voting history
+**Current Issue:** In-memory rate limiting doesn't work across Worker instances
+
+**Implementation:**
+
+**1. KV-Based Rate Limiting**
+```typescript
+// In wrangler.jsonc, add KV binding
+"kv_namespaces": [
+  { "binding": "RATE_LIMIT", "id": "..." }
+]
+
+// Implement distributed rate limiting
+const checkRateLimit = async (ip: string, kv: KVNamespace) => {
+  const key = `rate-limit:${ip}`
+  const data = await kv.get(key, 'json')
+
+  if (!data) {
+    await kv.put(key, JSON.stringify({ count: 1, windowStart: Date.now() }), {
+      expirationTtl: 60
+    })
+    return true
+  }
+
+  const { count, windowStart } = data
+  const now = Date.now()
+
+  if (now - windowStart >= 60000) {
+    await kv.put(key, JSON.stringify({ count: 1, windowStart: now }), {
+      expirationTtl: 60
+    })
+    return true
+  }
+
+  if (count >= 5) return false
+
+  await kv.put(key, JSON.stringify({ count: count + 1, windowStart }), {
+    expirationTtl: 60
+  })
+  return true
+}
+```
+
+**2. Per-Room Participant Limits**
+```typescript
+// In PokerRoom Durable Object
+const MAX_PARTICIPANTS = 100
+
+override async fetch(request: Request): Promise<Response> {
+  const participantCount = Object.keys(roomState.participants).length
+
+  if (participantCount >= MAX_PARTICIPANTS) {
+    return new Response('Room is full', { status: 429 })
+  }
+
+  return this.handleWebSocketUpgrade(request)
+}
+```
+
+**3. Progressive Rate Limiting**
+```typescript
+// Track violation count
+const violations = await kv.get(`violations:${ip}`, 'json') || 0
+
+// Stricter limits for repeat offenders
+const maxRequests = violations > 3 ? 2 : 5
+const windowMs = violations > 3 ? 120000 : 60000
+```
+
+**Success Criteria:**
+- [ ] KV namespace created and bound
+- [ ] Rate limiting works across Worker instances
+- [ ] Per-room participant limits enforced
+- [ ] Progressive rate limiting working
+- [ ] No single user can overwhelm system
+
+**Estimated Time:** 3 hours
 
 ---
 
-## Implementation Checklist
+## Phase 4: Core Feature Enhancements
 
-### Phase 1 - Critical Fixes ✅
-- [ ] 1.1 Fix heartbeat memory leak
-- [ ] 1.2 Fix authentication race condition
-- [ ] 1.3 Add reconnection backoff
-- [ ] 1.4 Add error handling for operations
-- [ ] Test all fixes together
-- [ ] Deploy to production
-- [ ] Verify no regressions
+**Priority:** MEDIUM
+**Timeline:** 3-4 days
+**Status:** Pending
 
-### Phase 2 - High Priority ✅
-- [ ] 2.1 Remove unused ws.get.ts
-- [ ] 2.2 Fix session timestamp validation
-- [ ] 2.3 Add input validation
-- [ ] 2.4 Fix default story title
-- [ ] Test all fixes together
-- [ ] Deploy to production
+### 4.1 Room Management Features ⏳
 
-### Phase 3 - Security & Polish ✅
-- [ ] 3.1 Implement rate limiting
-- [ ] 3.2 Replace console.log with logging
-- [ ] 3.3 Clean up documentation
-- [ ] 3.4 Use nanoid for user IDs
-- [ ] Security audit
-- [ ] Deploy to production
+**Goal:** Add room expiration and lifecycle management
 
-### Phase 4 - Long-term ✅
-- [ ] 4.1 Add test coverage
-- [ ] 4.2 Performance optimizations
-- [ ] 4.3 Enhanced features
-- [ ] Full end-to-end testing
-- [ ] Production monitoring setup
+**Implementation:**
+
+**1. Room Expiration with Alarms**
+```typescript
+// Use Durable Object Alarms API
+export class PokerRoom extends DurableObject {
+  async scheduleExpiration() {
+    const EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours
+    const expiresAt = Date.now() + EXPIRATION_TIME
+
+    await this.ctx.storage.setAlarm(expiresAt)
+  }
+
+  async alarm() {
+    // Send warning 1 hour before deletion
+    const roomState = await this.getRoomState()
+    const activeParticipants = this.ctx.getWebSockets().length
+
+    if (activeParticipants > 0) {
+      this.broadcastMessage({
+        type: 'warning',
+        payload: { message: 'Room will be deleted in 1 hour due to inactivity' }
+      })
+
+      // Reschedule for 1 hour
+      await this.ctx.storage.setAlarm(Date.now() + 60 * 60 * 1000)
+    } else {
+      // Delete room data
+      await this.ctx.storage.deleteAll()
+    }
+  }
+
+  // Reset expiration on activity
+  async handleMessage(ws: WebSocket, userId: string, message: WebSocketMessage) {
+    await this.scheduleExpiration() // Reset on any activity
+    // ... existing code
+  }
+}
+```
+
+**2. Room Extension**
+```typescript
+// Allow users to extend room lifetime
+{
+  type: 'extend',
+  hours: 24
+}
+
+// In message handler
+case 'extend': {
+  if (roomState.participants[userId]?.role !== 'moderator') {
+    ws.send(JSON.stringify({
+      type: 'error',
+      payload: { message: 'Only moderators can extend room lifetime' }
+    }))
+    return
+  }
+
+  const extensionMs = message.hours * 60 * 60 * 1000
+  await this.ctx.storage.setAlarm(Date.now() + extensionMs)
+  break
+}
+```
+
+**Success Criteria:**
+- [ ] Rooms expire after 24 hours of inactivity
+- [ ] Warning sent 1 hour before deletion
+- [ ] Moderators can extend room lifetime
+- [ ] Activity resets expiration timer
+- [ ] Deleted rooms cleaned up properly
+
+**Estimated Time:** 3 hours
+
+---
+
+### 4.2 Voting Features ⏳
+
+**Goal:** Add statistics, timer, and better visualization
+
+**Implementation:**
+
+**1. Vote Statistics**
+```typescript
+// Add computed statistics to usePokerRoom
+const statistics = computed(() => {
+  if (!roomState.value.votesRevealed) return null
+
+  const votes = roomState.value.participants
+    .map(p => p.vote)
+    .filter((v): v is number => typeof v === 'number')
+
+  if (votes.length === 0) return null
+
+  const sorted = [...votes].sort((a, b) => a - b)
+  const sum = votes.reduce((a, b) => a + b, 0)
+
+  return {
+    average: sum / votes.length,
+    median: sorted[Math.floor(sorted.length / 2)],
+    mode: findMode(votes),
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    consensus: calculateConsensus(votes),
+    count: votes.length,
+  }
+})
+
+const calculateConsensus = (votes: number[]) => {
+  const counts = votes.reduce((acc, v) => {
+    acc[v] = (acc[v] || 0) + 1
+    return acc
+  }, {} as Record<number, number>)
+
+  const maxCount = Math.max(...Object.values(counts))
+  return (maxCount / votes.length) * 100
+}
+```
+
+**2. Timer System**
+```typescript
+// Add timer state to RoomStorage
+interface RoomStorage {
+  participants: Record<string, Participant>
+  votesRevealed: boolean
+  storyTitle: string
+  timer?: {
+    duration: number // seconds
+    startedAt: number
+    expiresAt: number
+  }
+}
+
+// Timer actions
+{
+  type: 'start_timer',
+  duration: 180 // 3 minutes
+}
+
+{
+  type: 'cancel_timer'
+}
+
+// Auto-reveal on timer expiration
+private async checkTimer() {
+  const roomState = await this.getRoomState()
+
+  if (roomState.timer && Date.now() >= roomState.timer.expiresAt) {
+    roomState.votesRevealed = true
+    delete roomState.timer
+    await this.setRoomState(roomState)
+    await this.broadcastState()
+  }
+}
+```
+
+**3. Visual Consensus Indicator**
+```vue
+<template>
+  <div v-if="statistics" class="mt-4">
+    <h3 class="font-semibold">Statistics</h3>
+    <div class="grid grid-cols-2 gap-2">
+      <div>Average: {{ statistics.average.toFixed(1) }}</div>
+      <div>Median: {{ statistics.median }}</div>
+      <div>Mode: {{ statistics.mode }}</div>
+      <div>Range: {{ statistics.min }}-{{ statistics.max }}</div>
+    </div>
+
+    <!-- Consensus visualization -->
+    <div class="mt-2">
+      <div class="flex justify-between text-sm">
+        <span>Consensus</span>
+        <span>{{ statistics.consensus.toFixed(0) }}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2">
+        <div
+          class="h-2 rounded-full transition-all"
+          :class="{
+            'bg-red-500': statistics.consensus < 50,
+            'bg-yellow-500': statistics.consensus >= 50 && statistics.consensus < 75,
+            'bg-green-500': statistics.consensus >= 75,
+          }"
+          :style="{ width: `${statistics.consensus}%` }"
+        />
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+**Success Criteria:**
+- [ ] Statistics calculated and displayed
+- [ ] Timer can be set and cancelled
+- [ ] Auto-reveal on timer expiration
+- [ ] Consensus percentage shown
+- [ ] Visual indicators for alignment
+- [ ] Outlier detection working
+
+**Estimated Time:** 4 hours
+
+---
+
+### 4.3 Multiple Stories Support ⏳
+
+**Goal:** Support multiple estimation rounds and history
+
+**Implementation:**
+
+**1. Story Data Structure**
+```typescript
+interface Story {
+  id: string
+  title: string
+  description?: string
+  votes: Record<string, string | number | null>
+  revealed: boolean
+  createdAt: number
+  estimatedAt?: number
+  finalEstimate?: number
+}
+
+interface RoomStorage {
+  participants: Record<string, Participant>
+  currentStoryId?: string
+  stories: Record<string, Story>
+  storyOrder: string[]
+}
+```
+
+**2. Story Actions**
+```typescript
+{
+  type: 'create_story',
+  title: string,
+  description?: string
+}
+
+{
+  type: 'select_story',
+  storyId: string
+}
+
+{
+  type: 'finalize_story',
+  storyId: string,
+  estimate: number
+}
+
+{
+  type: 'delete_story',
+  storyId: string
+}
+```
+
+**3. Story List UI**
+```vue
+<template>
+  <div class="story-list">
+    <h3>Stories</h3>
+    <div
+      v-for="story in stories"
+      :key="story.id"
+      class="story-item"
+      :class="{ active: story.id === currentStoryId }"
+      @click="selectStory(story.id)"
+    >
+      <h4>{{ story.title }}</h4>
+      <div v-if="story.finalEstimate" class="estimate">
+        Final: {{ story.finalEstimate }}
+      </div>
+    </div>
+    <button @click="createNewStory">+ New Story</button>
+  </div>
+</template>
+```
+
+**4. Export Functionality**
+```typescript
+const exportHistory = () => {
+  const data = {
+    roomId,
+    exportedAt: Date.now(),
+    participants: roomState.value.participants,
+    stories: Object.values(roomState.value.stories).map(story => ({
+      title: story.title,
+      description: story.description,
+      finalEstimate: story.finalEstimate,
+      votes: story.votes,
+      votingCompleted: story.revealed,
+    })),
+  }
+
+  // CSV export
+  const csv = convertToCSV(data)
+  downloadFile(csv, `planning-poker-${roomId}.csv`, 'text/csv')
+
+  // JSON export
+  const json = JSON.stringify(data, null, 2)
+  downloadFile(json, `planning-poker-${roomId}.json`, 'application/json')
+}
+```
+
+**Success Criteria:**
+- [ ] Create and manage multiple stories
+- [ ] Switch between stories
+- [ ] View estimation history
+- [ ] Export to CSV format
+- [ ] Export to JSON format
+- [ ] Story templates working
+
+**Estimated Time:** 6 hours
+
+---
+
+### 4.4 Custom Vote Scales ⏳
+
+**Goal:** Support different estimation scales beyond Fibonacci
+
+**Implementation:**
+
+**1. Scale Definitions**
+```typescript
+interface VoteScale {
+  id: string
+  name: string
+  values: (string | number)[]
+  description: string
+}
+
+const VOTE_SCALES: Record<string, VoteScale> = {
+  fibonacci: {
+    id: 'fibonacci',
+    name: 'Fibonacci',
+    values: [1, 2, 3, 5, 8, 13, 21, '?', '☕'],
+    description: 'Classic Fibonacci sequence for story points',
+  },
+  tshirt: {
+    id: 'tshirt',
+    name: 'T-Shirt Sizes',
+    values: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?'],
+    description: 'T-shirt sizing for relative estimation',
+  },
+  hours: {
+    id: 'hours',
+    name: 'Hours',
+    values: [1, 2, 4, 8, 16, 24, 40, '?'],
+    description: 'Time-based estimation in hours',
+  },
+  days: {
+    id: 'days',
+    name: 'Days',
+    values: [0.5, 1, 2, 3, 5, 10, 20, '?'],
+    description: 'Time-based estimation in days',
+  },
+  custom: {
+    id: 'custom',
+    name: 'Custom',
+    values: [], // User-defined
+    description: 'Create your own scale',
+  },
+}
+```
+
+**2. Room Configuration**
+```typescript
+interface RoomStorage {
+  participants: Record<string, Participant>
+  votesRevealed: boolean
+  storyTitle: string
+  voteScale: string // Scale ID
+  customScaleValues?: (string | number)[]
+}
+
+// Message to change scale
+{
+  type: 'set_scale',
+  scaleId: string,
+  customValues?: (string | number)[]
+}
+```
+
+**3. UI for Scale Selection**
+```vue
+<template>
+  <div class="scale-selector">
+    <label>Voting Scale</label>
+    <select v-model="selectedScale" @change="changeScale">
+      <option v-for="scale in scales" :key="scale.id" :value="scale.id">
+        {{ scale.name }}
+      </option>
+    </select>
+
+    <div v-if="selectedScale === 'custom'" class="custom-scale-input">
+      <input
+        v-model="customScaleInput"
+        placeholder="Enter values (comma-separated)"
+      />
+      <button @click="saveCustomScale">Save Custom Scale</button>
+    </div>
+  </div>
+</template>
+```
+
+**4. Persist Scale Preference**
+```typescript
+// Save to localStorage
+const saveScalePreference = (scaleId: string) => {
+  localStorage.setItem('preferred-vote-scale', scaleId)
+}
+
+// Load preference on room creation
+const loadScalePreference = () => {
+  return localStorage.getItem('preferred-vote-scale') || 'fibonacci'
+}
+```
+
+**Success Criteria:**
+- [ ] Multiple scales available
+- [ ] Scale selection UI working
+- [ ] Custom scale creation working
+- [ ] Scale preference saved
+- [ ] Scale applied to voting cards
+- [ ] Backward compatibility maintained
+
+**Estimated Time:** 3 hours
+
+---
+
+## Phase 5: Advanced UX Features
+
+**Priority:** LOW
+**Timeline:** 2-3 days
+**Status:** Pending
+
+### 5.1 Dark Mode 🌙
+
+**Implementation:** System-aware dark mode with manual toggle
+
+**Estimated Time:** 2 hours
+
+---
+
+### 5.2 Enhanced Visualizations 📊
+
+**Implementation:** Voting distribution charts, trends, heatmaps
+
+**Estimated Time:** 4 hours
+
+---
+
+### 5.3 Improved Mobile Experience 📱
+
+**Implementation:** Touch-friendly UI, swipe gestures, responsive layouts
+
+**Estimated Time:** 4 hours
+
+---
+
+### 5.4 Collaboration Features 🤝
+
+**Implementation:** Spectator mode, integrations, screen sharing links
+
+**Estimated Time:** 6 hours
+
+---
+
+## Phase 6: Infrastructure & DevOps
+
+**Priority:** LOW
+**Timeline:** 1-2 days
+**Status:** Pending
+
+### 6.1 Monitoring & Alerting 📈
+
+**Implementation:** Error tracking, analytics dashboards, alerts
+
+**Estimated Time:** 3 hours
+
+---
+
+### 6.2 CI/CD Improvements 🚀
+
+**Implementation:** Staging environment, blue-green deployments, automation
+
+**Estimated Time:** 4 hours
+
+---
+
+### 6.3 Documentation 📚
+
+**Implementation:** API docs, JSDoc, architecture diagrams, deployment guide
+
+**Estimated Time:** 3 hours
+
+---
+
+## Implementation Strategy
+
+### Week 1: Quick Wins
+- Console.log cleanup (1 hour)
+- Type safety fixes (1 hour)
+- Health check endpoint (30 mins)
+- Test expansion (1 day)
+- E2E test setup (1 day)
+
+### Week 2: Foundation
+- Performance metrics (4 hours)
+- State optimization (4 hours)
+- WebSocket security (4 hours)
+- Room access control (4 hours)
+
+### Week 3: Core Features
+- Room expiration (3 hours)
+- Vote statistics (4 hours)
+- Timer system (2 hours)
+- Multiple stories (6 hours)
+
+### Week 4: Polish
+- Custom scales (3 hours)
+- Advanced visualizations (4 hours)
+- Mobile optimization (4 hours)
+- Documentation (3 hours)
 
 ---
 
 ## Success Metrics
 
-### After Phase 1:
-- No memory leaks in Durable Objects
-- Sessions persist across hibernation
-- Reconnection gracefully fails after max attempts
-- All operations validate user state
+### Technical Excellence
+- ✅ Test coverage > 80%
+- ✅ Zero console.logs in production
+- ✅ 100% type safety (no `any` types)
+- ✅ All critical paths have E2E tests
+- ✅ Performance: < 100ms message latency
+- ✅ Zero security vulnerabilities
 
-### After Phase 2:
-- No dead code in repository
-- All inputs validated
-- No user-facing test data
-- Session handling bulletproof
+### User Experience
+- ✅ Room creation success rate > 99%
+- ✅ Reconnection success rate > 95%
+- ✅ User satisfaction score > 4.5/5
+- ✅ Feature adoption rate > 60%
+- ✅ Mobile usability score > 85%
 
-### After Phase 3:
-- Rate limiting prevents abuse
-- Clean, structured logs
-- Complete documentation
-- Secure user ID generation
+### Security & Reliability
+- ✅ Zero security incidents
+- ✅ Rate limiting effectiveness > 99%
+- ✅ No unauthorized room access
+- ✅ Uptime > 99.9%
+- ✅ Error rate < 0.1%
 
-### After Phase 4:
-- >80% test coverage
-- Production-ready monitoring
-- Feature-complete planning poker app
-- Performance optimized
+### Business Metrics
+- 📈 Active users growth
+- 📈 Rooms created per day
+- 📈 Average session duration
+- 📈 Feature engagement rates
+- 📈 User retention rate
+
+---
+
+## Risk Mitigation
+
+1. **Incremental Deployment**: Each phase deployed separately
+2. **Feature Flags**: New features behind flags for gradual rollout
+3. **Rollback Plan**: Keep previous versions ready for quick rollback
+4. **User Communication**: Announce changes in advance
+5. **Performance Budget**: Monitor impact of each change
+6. **Testing Requirements**: No deploy without passing tests
+7. **Code Review**: All changes reviewed before merge
+
+---
+
+## Next Steps
+
+1. ✅ Create comprehensive improvement plan (this document)
+2. ⏳ Start with Phase 1.1 (console.log cleanup)
+3. ⏳ Set up test coverage reporting
+4. ⏳ Create GitHub issues for each phase
+5. ⏳ Track progress with detailed metrics
+6. ⏳ Gather user feedback continuously
+7. ⏳ Iterate based on data
 
 ---
 
 ## Resources
 
-- **Claude Code Review:** [PR #2](https://github.com/tombakerjr/planning-poker/pull/2)
 - **Production URL:** https://planning-poker.tombaker.workers.dev
+- **Repository:** https://github.com/tombakerjr/planning-poker
 - **Cloudflare Docs:** https://developers.cloudflare.com/durable-objects/
 - **WebSocket Hibernation:** https://developers.cloudflare.com/durable-objects/api/websockets/
+- **Playwright Docs:** https://playwright.dev/
+- **Vitest Coverage:** https://vitest.dev/guide/coverage.html
+- **Cloudflare Analytics:** https://developers.cloudflare.com/analytics/
 
 ---
 
-## Notes
+## Change Log
 
-- This plan assumes the app is not yet handling production traffic
-- Security items (rate limiting, etc.) should be prioritized if usage increases
-- Test coverage can be built incrementally alongside feature work
-- Each phase should be completed, tested, and deployed before moving to the next
+**2025-10-19:** Created comprehensive incremental improvement plan
+- Defined 6 phases of improvements
+- Set clear success metrics
+- Outlined implementation strategy
+- Established risk mitigation approach

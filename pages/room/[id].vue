@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { usePokerRoom } from '~/composables/usePokerRoom'
+import { usePokerRoom, PokerRoomKey } from '~/composables/usePokerRoom'
 
 const route = useRoute()
 const roomId = route.params.id as string
 
 // Initialize the poker room composable
 const pokerRoom = usePokerRoom(roomId)
+
+// Provide the poker room to child components with type safety
+provide(PokerRoomKey, pokerRoom)
 const {
   roomState,
   currentUser,

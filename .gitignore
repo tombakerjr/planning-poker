@@ -28,3 +28,6 @@ logs
 
 # Cloudflare Workers
 .wrangler
+
+# Test coverage
+coverage

@@ -1,24 +1,26 @@
 <script setup lang="ts">
+import { logger } from '~/server/utils/logger'
+
 const roomName = ref('')
 const isCreating = ref(false)
 const error = ref('')
 
 async function createRoom() {
   if (isCreating.value) return
-  
+
   isCreating.value = true
   error.value = ''
-  
+
   try {
     // Call the room creation API
     const response = await $fetch('/api/room/create', {
       method: 'POST',
     }) as { roomId: string }
-    
+
     // Navigate to the new room
     await navigateTo(`/room/${response.roomId}`)
   } catch (err: any) {
-    console.error('Error creating room:', err)
+    logger.error('Error creating room:', err)
     error.value = err.message || 'Failed to create room. Please try again.'
   } finally {
     isCreating.value = false

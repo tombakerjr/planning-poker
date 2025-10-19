@@ -25,6 +25,7 @@
     "@cloudflare/vitest-pool-workers": "^0.9.13",
     "@nuxtjs/tailwindcss": "7.0.0-beta.0",
     "@types/node": "^22.15.34",
+    "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
     "@vue/test-utils": "^2.4.6",
     "h3": "^1.15.3",
