@@ -6,6 +6,31 @@ const pokerRoom = inject(PokerRoomKey)
 if (!pokerRoom) throw new Error('PokerRoom not provided')
 
 const { roomState, revealVotes, resetRound, isJoined, votingComplete, isLoading, status } = pokerRoom
+
+// Generate a consistent color for each participant based on their ID
+const colorPalette = [
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-purple-500',
+  'bg-pink-500',
+  'bg-yellow-500',
+  'bg-red-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+  'bg-orange-500',
+  'bg-cyan-500',
+]
+
+function getParticipantColor(userId: string): string {
+  // Generate a hash from the userId
+  let hash = 0
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  // Use the hash to pick a color from the palette
+  const index = Math.abs(hash) % colorPalette.length
+  return colorPalette[index]
+}
 </script>
 
 <template>
@@ -28,7 +53,16 @@ const { roomState, revealVotes, resetRound, isJoined, votingComplete, isLoading,
         :key="participant.id"
         class="flex items-center justify-between rounded-lg bg-white p-3 shadow"
       >
-        <span class="font-medium text-gray-800">{{ participant.name }}</span>
+        <div class="flex items-center gap-3">
+          <!-- Color indicator -->
+          <div
+            class="h-8 w-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+            :class="getParticipantColor(participant.id)"
+          >
+            {{ participant.name.charAt(0).toUpperCase() }}
+          </div>
+          <span class="font-medium text-gray-800">{{ participant.name }}</span>
+        </div>
         <span class="w-8 text-center font-mono text-lg font-bold">
           <template v-if="!roomState.votesRevealed">
             <span v-if="participant.vote !== null" class="text-green-500">✔</span>
