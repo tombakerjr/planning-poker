@@ -1,4 +1,4 @@
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 
 export type ColorMode = 'light' | 'dark' | 'system'
 
@@ -87,9 +87,15 @@ export function useColorMode() {
       // Modern browsers
       if (mediaQuery.addEventListener) {
         mediaQuery.addEventListener('change', handleChange)
+        onUnmounted(() => {
+          mediaQuery.removeEventListener('change', handleChange)
+        })
       } else {
         // Fallback for older browsers
         mediaQuery.addListener(handleChange)
+        onUnmounted(() => {
+          mediaQuery.removeListener(handleChange)
+        })
       }
     }
   })

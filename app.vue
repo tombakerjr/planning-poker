@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useColorMode } from '~/composables/useColorMode'
 
-// Initialize color mode on app mount
-const { isDark } = useColorMode()
+// Initialize color mode on app mount (needed for side effects)
+useColorMode()
 </script>
 
 <template>
