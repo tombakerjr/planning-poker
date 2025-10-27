@@ -398,7 +398,10 @@ export class PokerRoom extends DurableObject {
 
         // Clear all participant votes to prevent data corruption
         Object.keys(roomState.participants).forEach(participantId => {
-          roomState.participants[participantId].vote = null;
+          const participant = roomState.participants[participantId];
+          if (participant) {
+            participant.vote = null;
+          }
         });
 
         // Reset reveal state since votes have been cleared
@@ -484,6 +487,7 @@ export class PokerRoom extends DurableObject {
       participants: {},
       votesRevealed: false,
       storyTitle: "",
+      votingScale: "fibonacci",
     };
   }
 

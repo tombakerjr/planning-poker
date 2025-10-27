@@ -299,9 +299,15 @@ export function usePokerRoom(roomId: string) {
 
     const mid = Math.floor(numericVotes.length / 2)
     if (numericVotes.length % 2 === 0) {
-      return Math.round(((numericVotes[mid - 1] + numericVotes[mid]) / 2) * 10) / 10
+      const val1 = numericVotes[mid - 1]
+      const val2 = numericVotes[mid]
+      if (val1 !== undefined && val2 !== undefined) {
+        return Math.round(((val1 + val2) / 2) * 10) / 10
+      }
+      return null
     }
-    return numericVotes[mid]
+    const medianVal = numericVotes[mid]
+    return medianVal !== undefined ? medianVal : null
   })
 
   const consensusPercentage = computed(() => {
