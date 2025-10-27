@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { logger } from '~/server/utils/logger'
 import { PokerRoomKey } from '~/composables/usePokerRoom'
+import { useVotingScale } from '~/composables/useVotingScale'
 
-const pokerDeck = ['1', '2', '3', '5', '8', '13', '21', '?', '☕️']
+// Use voting scale composable
+const { currentScale } = useVotingScale()
+const pokerDeck = computed(() => currentScale.value.values)
 
 // Inject the poker room state and actions with type safety
 const pokerRoom = inject(PokerRoomKey)

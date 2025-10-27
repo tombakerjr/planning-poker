@@ -58,6 +58,7 @@ interface RoomStorage {
   participants: Record<string, Participant>;
   votesRevealed: boolean;
   storyTitle: string;
+  votingScale?: string; // fibonacci, modified-fibonacci, t-shirt, etc.
 }
 
 interface AuthMessage {
@@ -96,6 +97,11 @@ interface SetStoryMessage {
   title: string;
 }
 
+interface SetScaleMessage {
+  type: "setScale";
+  scale: string;
+}
+
 type WebSocketMessage =
   | AuthMessage
   | JoinMessage
@@ -104,7 +110,8 @@ type WebSocketMessage =
   | ResetMessage
   | PingMessage
   | PongMessage
-  | SetStoryMessage;
+  | SetStoryMessage
+  | SetScaleMessage;
 
 interface WebSocketMeta {
   userId: string;
@@ -332,6 +339,19 @@ export class PokerRoom extends DurableObject {
         // Sanitize and limit story title length
         const sanitizedTitle = message.title?.trim().substring(0, 200);
         roomState.storyTitle = sanitizedTitle || "";
+        break;
+      }
+      case "setScale": {
+        // Validate user has joined before setting scale
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Must join room before setting voting scale" }
+          }));
+          return;
+        }
+        // Update voting scale
+        roomState.votingScale = message.scale;
         break;
       }
     }

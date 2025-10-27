@@ -13,6 +13,7 @@ export interface RoomState {
   participants: Participant[]
   votesRevealed: boolean
   storyTitle: string
+  votingScale?: string
 }
 
 export interface RoomMessage {
@@ -33,6 +34,7 @@ export function usePokerRoom(roomId: string) {
     participants: [],
     votesRevealed: false,
     storyTitle: '',
+    votingScale: 'fibonacci',
   })
 
   const currentUser = ref<{ id: string; name: string } | null>(null)
@@ -83,6 +85,7 @@ export function usePokerRoom(roomId: string) {
             participants: message.payload.participants || [],
             votesRevealed: message.payload.votesRevealed || false,
             storyTitle: message.payload.storyTitle || '',
+            votingScale: message.payload.votingScale || 'fibonacci',
           }
         }
         break
@@ -478,6 +481,31 @@ export function usePokerRoom(roomId: string) {
     }
   }
 
+  const setVotingScale = async (scale: string) => {
+    if (!isJoined.value) {
+      toast.error('Must join room before changing voting scale')
+      return false
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      toast.error('Not connected to room')
+      return false
+    }
+
+    try {
+      ws.send(JSON.stringify({
+        type: 'setScale',
+        scale
+      }))
+
+      return true
+    } catch (error) {
+      logger.error('Failed to set voting scale:', error)
+      toast.error('Failed to change voting scale')
+      return false
+    }
+  }
+
   const leaveRoom = () => {
     closeConnection()
     currentUser.value = null
@@ -486,6 +514,7 @@ export function usePokerRoom(roomId: string) {
       participants: [],
       votesRevealed: false,
       storyTitle: '',
+      votingScale: 'fibonacci',
     }
     // Don't clear session on leave - keep it for potential rejoin
   }
@@ -522,6 +551,7 @@ export function usePokerRoom(roomId: string) {
     revealVotes,
     resetRound,
     setStoryTitle,
+    setVotingScale,
   }
 }
 
