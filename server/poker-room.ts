@@ -49,6 +49,18 @@ const MAX_MESSAGES_PER_SECOND = 10;
 const RATE_LIMIT_WINDOW_MS = 1000; // 1 second
 const MAX_CONNECTIONS_PER_DO = 100;
 
+// Voting scale definitions (must match client-side definitions)
+const VALID_SCALES = ['fibonacci', 'modified-fibonacci', 't-shirt', 'powers-of-2', 'linear'] as const;
+type ValidScale = typeof VALID_SCALES[number];
+
+const SCALE_VALUES: Record<ValidScale, (string | number)[]> = {
+  'fibonacci': [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'],
+  'modified-fibonacci': [0, '½', 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'],
+  't-shirt': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?'],
+  'powers-of-2': [1, 2, 4, 8, 16, 32, 64, '?'],
+  'linear': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '?'],
+};
+
 interface Participant {
   name: string;
   vote: string | number | null;
@@ -294,6 +306,22 @@ export class PokerRoom extends DurableObject {
           }));
           return;
         }
+
+        // Validate vote against current scale
+        if (message.vote !== null) {
+          const currentScale = (roomState.votingScale || 'fibonacci') as ValidScale;
+          const validValues = SCALE_VALUES[currentScale] || SCALE_VALUES['fibonacci'];
+
+          // Check if vote is in allowed values
+          if (!validValues.includes(message.vote)) {
+            ws.send(JSON.stringify({
+              type: "error",
+              payload: { message: "Invalid vote value for current scale" }
+            }));
+            return;
+          }
+        }
+
         roomState.participants[userId].vote = message.vote;
         break;
       }
@@ -350,6 +378,16 @@ export class PokerRoom extends DurableObject {
           }));
           return;
         }
+
+        // Validate scale type against whitelist
+        if (!VALID_SCALES.includes(message.scale as ValidScale)) {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Invalid voting scale type" }
+          }));
+          return;
+        }
+
         // Update voting scale
         roomState.votingScale = message.scale;
         break;

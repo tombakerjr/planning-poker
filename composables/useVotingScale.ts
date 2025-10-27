@@ -68,8 +68,10 @@ export function useVotingScale() {
     return scale
   })
 
-  // Get all available scales
-  const availableScales = computed(() => Object.values(VOTING_SCALES))
+  // Get all available scales (excluding custom until fully implemented)
+  const availableScales = computed(() =>
+    Object.values(VOTING_SCALES).filter(scale => scale.id !== 'custom')
+  )
 
   // Load scale preference from localStorage
   const loadPreference = () => {
@@ -82,12 +84,30 @@ export function useVotingScale() {
         if (parsed.scaleType && VOTING_SCALES[parsed.scaleType]) {
           currentScaleType.value = parsed.scaleType
           if (parsed.scaleType === 'custom' && parsed.customValues) {
-            customValues.value = parsed.customValues
+            // Sanitize custom values
+            if (Array.isArray(parsed.customValues)) {
+              // Limit to max 20 items
+              const sanitized = parsed.customValues
+                .slice(0, 20)
+                .map((val: any) => {
+                  // Convert to string and limit length
+                  const str = String(val).substring(0, 10).trim()
+                  // Only allow alphanumeric, spaces, and common symbols
+                  return str.replace(/[^a-zA-Z0-9\s\-?☕½]/g, '')
+                })
+                .filter((val: string) => val.length > 0) // Remove empty values
+
+              if (sanitized.length > 0) {
+                customValues.value = sanitized
+              }
+            }
           }
         }
       }
     } catch (error) {
       console.error('Failed to load voting scale preference:', error)
+      // Clear corrupted data
+      localStorage.removeItem(STORAGE_KEY)
     }
   }
 

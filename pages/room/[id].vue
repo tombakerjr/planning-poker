@@ -34,11 +34,12 @@ const handleScaleChange = (scaleType: VotingScaleType) => {
 }
 
 // Sync room state scale with local composable
-watch(() => roomState.value.votingScale, (newScale) => {
-  if (newScale) {
+// Only update if the scale is actually different to avoid overwriting user preference
+watch(() => roomState.value.votingScale, (newScale, oldScale) => {
+  if (newScale && newScale !== oldScale) {
     setScale(newScale as VotingScaleType)
   }
-}, { immediate: true })
+})
 
 const showNameModal = ref(true)
 

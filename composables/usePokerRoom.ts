@@ -498,6 +498,7 @@ export function usePokerRoom(roomId: string) {
         scale
       }))
 
+      toast.success('Voting scale updated!')
       return true
     } catch (error) {
       logger.error('Failed to set voting scale:', error)

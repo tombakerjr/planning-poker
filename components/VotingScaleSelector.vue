@@ -13,6 +13,26 @@ function handleScaleChange(scaleType: VotingScaleType) {
   emit('change', scaleType)
   isOpen.value = false
 }
+
+// Close dropdown on Escape key
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && isOpen.value) {
+    isOpen.value = false
+  }
+}
+
+// Add/remove keyboard listener
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', handleKeydown)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('keydown', handleKeydown)
+  }
+})
 </script>
 
 <template>

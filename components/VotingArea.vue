@@ -7,6 +7,12 @@ import { useVotingScale } from '~/composables/useVotingScale'
 const { currentScale } = useVotingScale()
 const pokerDeck = computed(() => currentScale.value.values)
 
+// Check if current scale supports numeric statistics
+const supportsNumericStats = computed(() => {
+  // Only show stats for scales with numeric values
+  return ['fibonacci', 'modified-fibonacci', 'powers-of-2', 'linear'].includes(currentScale.value.id)
+})
+
 // Inject the poker room state and actions with type safety
 const pokerRoom = inject(PokerRoomKey)
 if (!pokerRoom) throw new Error('PokerRoom not provided')
@@ -148,7 +154,7 @@ function handleStoryKeydown(event: KeyboardEvent) {
 
     <!-- Voting status -->
     <div v-if="isJoined" class="mt-4 text-center">
-      <div v-if="roomState.votesRevealed && (averageVote !== null || medianVote !== null)" class="space-y-2">
+      <div v-if="roomState.votesRevealed && supportsNumericStats && (averageVote !== null || medianVote !== null)" class="space-y-2">
         <!-- Statistics Grid -->
         <div class="grid grid-cols-3 gap-3 text-sm">
           <div v-if="averageVote !== null" class="rounded-lg bg-blue-50 dark:bg-blue-900/30 p-3 transition-colors duration-200">
