@@ -8,9 +8,11 @@ const pokerDeck = ['1', '2', '3', '5', '8', '13', '21', '?', '☕️']
 const pokerRoom = inject(PokerRoomKey)
 if (!pokerRoom) throw new Error('PokerRoom not provided')
 
-const { roomState, isJoined, vote, myVote, votingComplete, averageVote } = pokerRoom
+const { roomState, isJoined, vote, myVote, votingComplete, averageVote, medianVote, consensusPercentage, setStoryTitle } = pokerRoom
 
 const selectedValue = ref<string | number | null>(null)
+const isEditingStory = ref(false)
+const storyInput = ref('')
 
 // Watch for changes in our vote from the server
 watchEffect(() => {
@@ -31,15 +33,89 @@ function handleSelect(value: string | number) {
   // Send vote to server
   vote(newValue)
 }
+
+function startEditingStory() {
+  if (!isJoined.value) return
+  storyInput.value = roomState.value.storyTitle
+  isEditingStory.value = true
+}
+
+function cancelEditStory() {
+  isEditingStory.value = false
+  storyInput.value = ''
+}
+
+function saveStoryTitle() {
+  if (storyInput.value.trim()) {
+    setStoryTitle(storyInput.value)
+  }
+  isEditingStory.value = false
+  storyInput.value = ''
+}
+
+function handleStoryKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    saveStoryTitle()
+  } else if (event.key === 'Escape') {
+    cancelEditStory()
+  }
+}
 </script>
 
 <template>
   <div class="w-full max-w-2xl rounded-lg bg-gray-50 p-6 shadow-md">
     <div class="text-center">
       <h2 class="text-lg font-semibold text-gray-600">Story for Estimation:</h2>
-      <p class="mb-6 text-xl font-bold text-gray-800">
-        {{ roomState.storyTitle || 'No story set yet' }}
-      </p>
+
+      <!-- Story Title Display/Edit -->
+      <div class="mb-6">
+        <div v-if="!isEditingStory" class="group flex items-center justify-center gap-2">
+          <p class="text-xl font-bold text-gray-800">
+            {{ roomState.storyTitle || 'No story set yet' }}
+          </p>
+          <button
+            v-if="isJoined"
+            @click="startEditingStory"
+            class="opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-gray-200"
+            title="Edit story"
+          >
+            <svg class="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Edit Mode -->
+        <div v-else class="flex items-center justify-center gap-2">
+          <input
+            v-model="storyInput"
+            type="text"
+            placeholder="Enter story title..."
+            @keydown="handleStoryKeydown"
+            class="flex-1 max-w-md rounded-md border border-gray-300 px-3 py-2 text-center text-xl font-bold focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            autofocus
+          />
+          <button
+            @click="saveStoryTitle"
+            class="rounded-md bg-green-600 p-2 text-white hover:bg-green-700"
+            title="Save"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+          <button
+            @click="cancelEditStory"
+            class="rounded-md bg-gray-400 p-2 text-white hover:bg-gray-500"
+            title="Cancel"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Voting disabled message -->
@@ -69,8 +145,43 @@ function handleSelect(value: string | number) {
 
     <!-- Voting status -->
     <div v-if="isJoined" class="mt-4 text-center">
-      <div v-if="roomState.votesRevealed && averageVote !== null" class="text-sm text-gray-600">
-        <p>Average: <span class="font-bold text-green-600">{{ averageVote }}</span></p>
+      <div v-if="roomState.votesRevealed && (averageVote !== null || medianVote !== null)" class="space-y-2">
+        <!-- Statistics Grid -->
+        <div class="grid grid-cols-3 gap-3 text-sm">
+          <div v-if="averageVote !== null" class="rounded-lg bg-blue-50 p-3">
+            <p class="text-xs text-gray-600">Average</p>
+            <p class="text-lg font-bold text-blue-600">{{ averageVote }}</p>
+          </div>
+          <div v-if="medianVote !== null" class="rounded-lg bg-green-50 p-3">
+            <p class="text-xs text-gray-600">Median</p>
+            <p class="text-lg font-bold text-green-600">{{ medianVote }}</p>
+          </div>
+          <div v-if="consensusPercentage !== null" class="rounded-lg bg-purple-50 p-3">
+            <p class="text-xs text-gray-600">Consensus</p>
+            <p class="text-lg font-bold text-purple-600">{{ consensusPercentage }}%</p>
+          </div>
+        </div>
+        <!-- Consensus indicator -->
+        <div v-if="consensusPercentage !== null" class="mt-2">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div
+              class="h-2 rounded-full transition-all duration-300"
+              :class="{
+                'bg-red-500': consensusPercentage < 50,
+                'bg-yellow-500': consensusPercentage >= 50 && consensusPercentage < 75,
+                'bg-green-500': consensusPercentage >= 75
+              }"
+              :style="{ width: `${consensusPercentage}%` }"
+            ></div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">
+            {{
+              consensusPercentage >= 75 ? 'Strong consensus!' :
+              consensusPercentage >= 50 ? 'Moderate agreement' :
+              'Low consensus - discuss?'
+            }}
+          </p>
+        </div>
       </div>
       <div v-else-if="votingComplete" class="text-sm text-green-600">
         <p>All votes are in! Ready to reveal.</p>

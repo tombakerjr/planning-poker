@@ -274,6 +274,46 @@ export function usePokerRoom(roomId: string) {
     return Math.round((sum / numericVotes.length) * 10) / 10
   })
 
+  const medianVote = computed(() => {
+    if (!roomState.value.votesRevealed) return null
+
+    const numericVotes = roomState.value.participants
+      .map(p => p.vote)
+      .filter((vote): vote is number => typeof vote === 'number')
+      .sort((a, b) => a - b)
+
+    if (numericVotes.length === 0) return null
+
+    const mid = Math.floor(numericVotes.length / 2)
+    if (numericVotes.length % 2 === 0) {
+      return Math.round(((numericVotes[mid - 1] + numericVotes[mid]) / 2) * 10) / 10
+    }
+    return numericVotes[mid]
+  })
+
+  const consensusPercentage = computed(() => {
+    if (!roomState.value.votesRevealed) return null
+
+    const votes = roomState.value.participants
+      .map(p => p.vote)
+      .filter(vote => vote !== null)
+
+    if (votes.length === 0) return null
+
+    // Count occurrences of each vote
+    const voteCounts = new Map<string | number, number>()
+    votes.forEach(vote => {
+      const count = voteCounts.get(vote!) || 0
+      voteCounts.set(vote!, count + 1)
+    })
+
+    // Find the most common vote count
+    const maxCount = Math.max(...Array.from(voteCounts.values()))
+
+    // Calculate percentage of participants who voted for the most common value
+    return Math.round((maxCount / votes.length) * 100)
+  })
+
   // Actions
   const joinRoom = async (name: string) => {
     const trimmedName = name.trim().substring(0, MAX_NAME_LENGTH);
@@ -413,6 +453,31 @@ export function usePokerRoom(roomId: string) {
     }
   }
 
+  const setStoryTitle = async (title: string) => {
+    if (!isJoined.value) {
+      toast.error('Must join room before setting story')
+      return false
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      toast.error('Not connected to room')
+      return false
+    }
+
+    try {
+      ws.send(JSON.stringify({
+        type: 'setStory',
+        title: title.trim()
+      }))
+
+      return true
+    } catch (error) {
+      logger.error('Failed to set story:', error)
+      toast.error('Failed to set story title')
+      return false
+    }
+  }
+
   const leaveRoom = () => {
     closeConnection()
     currentUser.value = null
@@ -445,6 +510,8 @@ export function usePokerRoom(roomId: string) {
     myVote,
     votingComplete,
     averageVote,
+    medianVote,
+    consensusPercentage,
 
     // Actions
     connectToRoom,
@@ -454,6 +521,7 @@ export function usePokerRoom(roomId: string) {
     vote,
     revealVotes,
     resetRound,
+    setStoryTitle,
   }
 }
 

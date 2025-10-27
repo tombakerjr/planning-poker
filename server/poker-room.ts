@@ -91,6 +91,11 @@ interface PongMessage {
   type: "pong";
 }
 
+interface SetStoryMessage {
+  type: "setStory";
+  title: string;
+}
+
 type WebSocketMessage =
   | AuthMessage
   | JoinMessage
@@ -98,7 +103,8 @@ type WebSocketMessage =
   | RevealMessage
   | ResetMessage
   | PingMessage
-  | PongMessage;
+  | PongMessage
+  | SetStoryMessage;
 
 interface WebSocketMeta {
   userId: string;
@@ -312,6 +318,20 @@ export class PokerRoom extends DurableObject {
             participant.vote = null;
           }
         }
+        break;
+      }
+      case "setStory": {
+        // Validate user has joined before setting story
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Must join room before setting story" }
+          }));
+          return;
+        }
+        // Sanitize and limit story title length
+        const sanitizedTitle = message.title?.trim().substring(0, 200);
+        roomState.storyTitle = sanitizedTitle || "";
         break;
       }
     }

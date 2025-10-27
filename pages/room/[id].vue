@@ -52,6 +52,31 @@ const handleJoinRoom = (name: string) => {
   }
 }
 
+// Copy room link to clipboard
+const { success: toastSuccess } = useToast()
+const copyRoomLink = async () => {
+  const roomUrl = `${window.location.origin}/room/${roomId}`
+  try {
+    await navigator.clipboard.writeText(roomUrl)
+    toastSuccess('Room link copied to clipboard!')
+  } catch (error) {
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea')
+    textArea.value = roomUrl
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      toastSuccess('Room link copied to clipboard!')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+    document.body.removeChild(textArea)
+  }
+}
+
 // Show modal again if disconnected
 watch(status, (newStatus) => {
   if (newStatus === 'CLOSED' && isJoined.value) {
@@ -66,28 +91,42 @@ watch(status, (newStatus) => {
       <div class="mx-auto max-w-screen-xl px-4 py-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between">
           <h1 class="text-2xl font-bold text-gray-900">Planning Poker</h1>
-          
-          <!-- Connection Status -->
-          <div class="flex items-center gap-2">
-            <div
-              class="h-2 w-2 rounded-full"
-              :class="{
-                'bg-green-500': status === 'OPEN',
-                'bg-yellow-500 animate-pulse': status === 'CONNECTING' || status === 'RECONNECTING',
-                'bg-red-500': status === 'CLOSED'
-              }"
-            />
-            <span class="text-sm text-gray-600">
-              {{
-                status === 'OPEN'
-                  ? 'Connected'
-                  : status === 'CONNECTING'
-                  ? 'Connecting...'
-                  : status === 'RECONNECTING'
-                  ? `Reconnecting (${reconnectAttempts}/10)...`
-                  : 'Disconnected'
-              }}
-            </span>
+
+          <div class="flex items-center gap-4">
+            <!-- Copy Link Button -->
+            <button
+              @click="copyRoomLink"
+              class="flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              title="Copy room link"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span class="hidden sm:inline">Copy Link</span>
+            </button>
+
+            <!-- Connection Status -->
+            <div class="flex items-center gap-2">
+              <div
+                class="h-2 w-2 rounded-full"
+                :class="{
+                  'bg-green-500': status === 'OPEN',
+                  'bg-yellow-500 animate-pulse': status === 'CONNECTING' || status === 'RECONNECTING',
+                  'bg-red-500': status === 'CLOSED'
+                }"
+              />
+              <span class="text-sm text-gray-600">
+                {{
+                  status === 'OPEN'
+                    ? 'Connected'
+                    : status === 'CONNECTING'
+                    ? 'Connecting...'
+                    : status === 'RECONNECTING'
+                    ? `Reconnecting (${reconnectAttempts}/10)...`
+                    : 'Disconnected'
+                }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
