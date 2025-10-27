@@ -21,15 +21,15 @@ const getIcon = (type: string) => {
 const getColorClasses = (type: string) => {
   switch (type) {
     case 'success':
-      return 'bg-green-50 border-green-500 text-green-800'
+      return 'bg-green-50 dark:bg-green-900/30 border-green-500 dark:border-green-400 text-green-800 dark:text-green-200 transition-colors duration-200'
     case 'error':
-      return 'bg-red-50 border-red-500 text-red-800'
+      return 'bg-red-50 dark:bg-red-900/30 border-red-500 dark:border-red-400 text-red-800 dark:text-red-200 transition-colors duration-200'
     case 'warning':
-      return 'bg-yellow-50 border-yellow-500 text-yellow-800'
+      return 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-500 dark:border-yellow-400 text-yellow-800 dark:text-yellow-200 transition-colors duration-200'
     case 'info':
-      return 'bg-blue-50 border-blue-500 text-blue-800'
+      return 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 dark:border-blue-400 text-blue-800 dark:text-blue-200 transition-colors duration-200'
     default:
-      return 'bg-gray-50 border-gray-500 text-gray-800'
+      return 'bg-gray-50 dark:bg-gray-800 border-gray-500 dark:border-gray-400 text-gray-800 dark:text-gray-200 transition-colors duration-200'
   }
 }
 </script>
@@ -67,12 +67,12 @@ const getColorClasses = (type: string) => {
               <div class="ml-4 flex flex-shrink-0">
                 <button
                   @click="removeToast(toast.id)"
-                  class="inline-flex rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  class="inline-flex rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-200"
                   :class="{
-                    'text-green-500 hover:text-green-600 focus:ring-green-500': toast.type === 'success',
-                    'text-red-500 hover:text-red-600 focus:ring-red-500': toast.type === 'error',
-                    'text-yellow-500 hover:text-yellow-600 focus:ring-yellow-500': toast.type === 'warning',
-                    'text-blue-500 hover:text-blue-600 focus:ring-blue-500': toast.type === 'info',
+                    'text-green-500 dark:text-green-400 hover:text-green-600 dark:hover:text-green-300 focus:ring-green-500 dark:focus:ring-green-400': toast.type === 'success',
+                    'text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 focus:ring-red-500 dark:focus:ring-red-400': toast.type === 'error',
+                    'text-yellow-500 dark:text-yellow-400 hover:text-yellow-600 dark:hover:text-yellow-300 focus:ring-yellow-500 dark:focus:ring-yellow-400': toast.type === 'warning',
+                    'text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 focus:ring-blue-500 dark:focus:ring-blue-400': toast.type === 'info',
                   }"
                 >
                   <span class="sr-only">Close</span>

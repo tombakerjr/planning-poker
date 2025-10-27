@@ -86,17 +86,20 @@ watch(status, (newStatus) => {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-gray-100">
-    <header class="border-b border-gray-200 bg-white shadow-sm">
+  <div class="flex min-h-screen flex-col bg-gray-100 dark:bg-gray-900 transition-colors duration-200">
+    <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200">
       <div class="mx-auto max-w-screen-xl px-4 py-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between">
-          <h1 class="text-2xl font-bold text-gray-900">Planning Poker</h1>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">Planning Poker</h1>
 
           <div class="flex items-center gap-4">
+            <!-- Theme Toggle -->
+            <ThemeToggle />
+
             <!-- Copy Link Button -->
             <button
               @click="copyRoomLink"
-              class="flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              class="flex items-center gap-2 rounded-md bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
               title="Copy room link"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,7 +118,7 @@ watch(status, (newStatus) => {
                   'bg-red-500': status === 'CLOSED'
                 }"
               />
-              <span class="text-sm text-gray-600">
+              <span class="text-sm text-gray-600 dark:text-gray-300 transition-colors duration-200">
                 {{
                   status === 'OPEN'
                     ? 'Connected'
@@ -136,8 +139,8 @@ watch(status, (newStatus) => {
       <!-- Loading/Connection State -->
       <div v-if="status === 'CONNECTING'" class="mx-auto max-w-screen-xl">
         <div class="text-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p class="text-gray-600">Connecting to room...</p>
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
+          <p class="text-gray-600 dark:text-gray-300 transition-colors duration-200">Connecting to room...</p>
         </div>
       </div>
 
@@ -160,16 +163,16 @@ watch(status, (newStatus) => {
       <!-- Connection Error -->
       <div v-else class="mx-auto max-w-screen-xl">
         <div class="text-center py-12">
-          <div class="text-red-500 mb-4">
+          <div class="text-red-500 dark:text-red-400 mb-4">
             <svg class="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
             </svg>
           </div>
-          <h2 class="text-xl font-semibold text-gray-900 mb-2">Connection Failed</h2>
-          <p class="text-gray-600 mb-4">Unable to connect to the room</p>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Connection Failed</h2>
+          <p class="text-gray-600 dark:text-gray-300 mb-4 transition-colors duration-200">Unable to connect to the room</p>
           <button
             @click="connectToRoom"
-            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="rounded-md bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
           >
             Try Again
           </button>
@@ -177,7 +180,7 @@ watch(status, (newStatus) => {
       </div>
     </main>
 
-    <footer class="py-4 text-center text-sm text-gray-500">
+    <footer class="py-4 text-center text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">
       <p>Room ID: {{ route.params.id }}</p>
       <p v-if="currentUser && isJoined" class="mt-1">
         Joined as: <span class="font-medium">{{ currentUser.name }}</span>

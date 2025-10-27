@@ -34,16 +34,16 @@ function getParticipantColor(userId: string): string {
 </script>
 
 <template>
-  <div class="w-full max-w-sm rounded-lg bg-gray-100 p-4 shadow-lg">
+  <div class="w-full max-w-sm rounded-lg bg-gray-100 dark:bg-gray-800 p-4 shadow-lg transition-colors duration-200">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-bold text-gray-700">Participants</h2>
-      <span class="text-sm text-gray-500">{{ roomState.participants.length }}</span>
+      <h2 class="text-xl font-bold text-gray-700 dark:text-white transition-colors duration-200">Participants</h2>
+      <span class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">{{ roomState.participants.length }}</span>
     </div>
 
     <!-- Empty state -->
     <div v-if="roomState.participants.length === 0" class="text-center py-8">
-      <p class="text-gray-500">No participants yet</p>
-      <p class="text-sm text-gray-400 mt-1">Waiting for people to join...</p>
+      <p class="text-gray-500 dark:text-gray-400 transition-colors duration-200">No participants yet</p>
+      <p class="text-sm text-gray-400 dark:text-gray-500 mt-1 transition-colors duration-200">Waiting for people to join...</p>
     </div>
 
     <!-- Participants list -->
@@ -51,7 +51,7 @@ function getParticipantColor(userId: string): string {
       <li
         v-for="participant in roomState.participants"
         :key="participant.id"
-        class="flex items-center justify-between rounded-lg bg-white p-3 shadow"
+        class="flex items-center justify-between rounded-lg bg-white dark:bg-gray-700 p-3 shadow transition-colors duration-200"
       >
         <div class="flex items-center gap-3">
           <!-- Color indicator -->
@@ -61,15 +61,15 @@ function getParticipantColor(userId: string): string {
           >
             {{ participant.name.charAt(0).toUpperCase() }}
           </div>
-          <span class="font-medium text-gray-800">{{ participant.name }}</span>
+          <span class="font-medium text-gray-800 dark:text-white transition-colors duration-200">{{ participant.name }}</span>
         </div>
         <span class="w-8 text-center font-mono text-lg font-bold">
           <template v-if="!roomState.votesRevealed">
-            <span v-if="participant.vote !== null" class="text-green-500">✔</span>
-            <span v-else class="text-gray-400">...</span>
+            <span v-if="participant.vote !== null" class="text-green-500 dark:text-green-400">✔</span>
+            <span v-else class="text-gray-400 dark:text-gray-500">...</span>
           </template>
           <template v-else>
-            <span class="text-blue-600">{{ participant.vote ?? '-' }}</span>
+            <span class="text-blue-600 dark:text-blue-400 transition-colors duration-200">{{ participant.vote ?? '-' }}</span>
           </template>
         </span>
       </li>
@@ -82,7 +82,7 @@ function getParticipantColor(userId: string): string {
         @click="revealVotes"
         :disabled="isLoading || status !== 'OPEN'"
         class="w-full rounded-md px-4 py-2 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
-        :class="isLoading ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500'"
+        :class="isLoading ? 'bg-green-500 dark:bg-green-400' : 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400'"
       >
         <span v-if="isLoading" class="flex items-center justify-center">
           <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -99,7 +99,7 @@ function getParticipantColor(userId: string): string {
         @click="resetRound"
         :disabled="isLoading || status !== 'OPEN'"
         class="w-full rounded-md px-4 py-2 text-sm font-medium text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
-        :class="isLoading ? 'bg-blue-500' : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'"
+        :class="isLoading ? 'bg-blue-500 dark:bg-blue-400' : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'"
       >
         <span v-if="isLoading" class="flex items-center justify-center">
           <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -112,20 +112,20 @@ function getParticipantColor(userId: string): string {
       </button>
 
       <!-- Disconnected hint -->
-      <p v-if="status !== 'OPEN'" class="text-xs text-center text-gray-500 mt-2">
+      <p v-if="status !== 'OPEN'" class="text-xs text-center text-gray-500 dark:text-gray-400 mt-2 transition-colors duration-200">
         Reconnecting to enable controls...
       </p>
     </div>
 
     <!-- Voting Progress -->
     <div v-if="roomState.participants.length > 0" class="mt-4">
-      <div class="flex justify-between text-xs text-gray-500 mb-1">
+      <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1 transition-colors duration-200">
         <span>Voting Progress</span>
         <span>{{ roomState.participants.filter(p => p.vote !== null).length }}/{{ roomState.participants.length }}</span>
       </div>
-      <div class="w-full bg-gray-200 rounded-full h-2">
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 transition-colors duration-200">
         <div
-          class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+          class="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
           :style="{
             width: `${(roomState.participants.filter(p => p.vote !== null).length / roomState.participants.length) * 100}%`
           }"

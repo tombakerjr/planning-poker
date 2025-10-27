@@ -64,23 +64,23 @@ function handleStoryKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="w-full max-w-2xl rounded-lg bg-gray-50 p-6 shadow-md">
+  <div class="w-full max-w-2xl rounded-lg bg-gray-50 dark:bg-gray-800 p-6 shadow-md transition-colors duration-200">
     <div class="text-center">
-      <h2 class="text-lg font-semibold text-gray-600">Story for Estimation:</h2>
+      <h2 class="text-lg font-semibold text-gray-600 dark:text-gray-300 transition-colors duration-200">Story for Estimation:</h2>
 
       <!-- Story Title Display/Edit -->
       <div class="mb-6">
         <div v-if="!isEditingStory" class="group flex items-center justify-center gap-2">
-          <p class="text-xl font-bold text-gray-800">
+          <p class="text-xl font-bold text-gray-800 dark:text-white transition-colors duration-200">
             {{ roomState.storyTitle || 'No story set yet' }}
           </p>
           <button
             v-if="isJoined"
             @click="startEditingStory"
-            class="opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-gray-200"
+            class="opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
             title="Edit story"
           >
-            <svg class="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-4 w-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
           </button>
@@ -93,12 +93,12 @@ function handleStoryKeydown(event: KeyboardEvent) {
             type="text"
             placeholder="Enter story title..."
             @keydown="handleStoryKeydown"
-            class="flex-1 max-w-md rounded-md border border-gray-300 px-3 py-2 text-center text-xl font-bold focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            class="flex-1 max-w-md rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-center text-xl font-bold text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
             autofocus
           />
           <button
             @click="saveStoryTitle"
-            class="rounded-md bg-green-600 p-2 text-white hover:bg-green-700"
+            class="rounded-md bg-green-600 dark:bg-green-500 p-2 text-white hover:bg-green-700 dark:hover:bg-green-600 transition-colors duration-200"
             title="Save"
           >
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,7 +107,7 @@ function handleStoryKeydown(event: KeyboardEvent) {
           </button>
           <button
             @click="cancelEditStory"
-            class="rounded-md bg-gray-400 p-2 text-white hover:bg-gray-500"
+            class="rounded-md bg-gray-400 dark:bg-gray-600 p-2 text-white hover:bg-gray-500 dark:hover:bg-gray-700 transition-colors duration-200"
             title="Cancel"
           >
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,7 +120,7 @@ function handleStoryKeydown(event: KeyboardEvent) {
 
     <!-- Voting disabled message -->
     <div v-if="!isJoined" class="mb-4 text-center">
-      <p class="text-sm text-gray-500">Join the room to start voting</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">Join the room to start voting</p>
     </div>
 
     <div 
@@ -137,8 +137,8 @@ function handleStoryKeydown(event: KeyboardEvent) {
     </div>
 
     <div class="mt-8 text-center">
-      <p class="text-gray-600">Your vote:</p>
-      <p class="min-h-[48px] text-4xl font-bold text-blue-600">
+      <p class="text-gray-600 dark:text-gray-300 transition-colors duration-200">Your vote:</p>
+      <p class="min-h-[48px] text-4xl font-bold text-blue-600 dark:text-blue-400 transition-colors duration-200">
         {{ selectedValue ?? '...' }}
       </p>
     </div>
@@ -148,22 +148,22 @@ function handleStoryKeydown(event: KeyboardEvent) {
       <div v-if="roomState.votesRevealed && (averageVote !== null || medianVote !== null)" class="space-y-2">
         <!-- Statistics Grid -->
         <div class="grid grid-cols-3 gap-3 text-sm">
-          <div v-if="averageVote !== null" class="rounded-lg bg-blue-50 p-3">
-            <p class="text-xs text-gray-600">Average</p>
-            <p class="text-lg font-bold text-blue-600">{{ averageVote }}</p>
+          <div v-if="averageVote !== null" class="rounded-lg bg-blue-50 dark:bg-blue-900/30 p-3 transition-colors duration-200">
+            <p class="text-xs text-gray-600 dark:text-gray-300 transition-colors duration-200">Average</p>
+            <p class="text-lg font-bold text-blue-600 dark:text-blue-400 transition-colors duration-200">{{ averageVote }}</p>
           </div>
-          <div v-if="medianVote !== null" class="rounded-lg bg-green-50 p-3">
-            <p class="text-xs text-gray-600">Median</p>
-            <p class="text-lg font-bold text-green-600">{{ medianVote }}</p>
+          <div v-if="medianVote !== null" class="rounded-lg bg-green-50 dark:bg-green-900/30 p-3 transition-colors duration-200">
+            <p class="text-xs text-gray-600 dark:text-gray-300 transition-colors duration-200">Median</p>
+            <p class="text-lg font-bold text-green-600 dark:text-green-400 transition-colors duration-200">{{ medianVote }}</p>
           </div>
-          <div v-if="consensusPercentage !== null" class="rounded-lg bg-purple-50 p-3">
-            <p class="text-xs text-gray-600">Consensus</p>
-            <p class="text-lg font-bold text-purple-600">{{ consensusPercentage }}%</p>
+          <div v-if="consensusPercentage !== null" class="rounded-lg bg-purple-50 dark:bg-purple-900/30 p-3 transition-colors duration-200">
+            <p class="text-xs text-gray-600 dark:text-gray-300 transition-colors duration-200">Consensus</p>
+            <p class="text-lg font-bold text-purple-600 dark:text-purple-400 transition-colors duration-200">{{ consensusPercentage }}%</p>
           </div>
         </div>
         <!-- Consensus indicator -->
         <div v-if="consensusPercentage !== null" class="mt-2">
-          <div class="w-full bg-gray-200 rounded-full h-2">
+          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 transition-colors duration-200">
             <div
               class="h-2 rounded-full transition-all duration-300"
               :class="{
@@ -174,7 +174,7 @@ function handleStoryKeydown(event: KeyboardEvent) {
               :style="{ width: `${consensusPercentage}%` }"
             ></div>
           </div>
-          <p class="text-xs text-gray-500 mt-1">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 transition-colors duration-200">
             {{
               consensusPercentage >= 75 ? 'Strong consensus!' :
               consensusPercentage >= 50 ? 'Moderate agreement' :
@@ -183,7 +183,7 @@ function handleStoryKeydown(event: KeyboardEvent) {
           </p>
         </div>
       </div>
-      <div v-else-if="votingComplete" class="text-sm text-green-600">
+      <div v-else-if="votingComplete" class="text-sm text-green-600 dark:text-green-400 transition-colors duration-200">
         <p>All votes are in! Ready to reveal.</p>
       </div>
     </div>
