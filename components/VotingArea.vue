@@ -3,8 +3,14 @@ import { logger } from '~/server/utils/logger'
 import { PokerRoomKey } from '~/composables/usePokerRoom'
 import { useVotingScale } from '~/composables/useVotingScale'
 
-// Use voting scale composable
-const { currentScale } = useVotingScale()
+// Inject the poker room state and actions with type safety
+const pokerRoom = inject(PokerRoomKey)
+if (!pokerRoom) throw new Error('PokerRoom not provided')
+
+const { roomState, isJoined, vote, myVote, votingComplete, averageVote, medianVote, consensusPercentage, setStoryTitle } = pokerRoom
+
+// Use voting scale composable with the room's current scale
+const { currentScale } = useVotingScale(computed(() => roomState.value.votingScale))
 const pokerDeck = computed(() => currentScale.value.values)
 
 // Check if current scale supports numeric statistics
@@ -12,12 +18,6 @@ const supportsNumericStats = computed(() => {
   // Only show stats for scales with numeric values
   return ['fibonacci', 'modified-fibonacci', 'powers-of-2', 'linear'].includes(currentScale.value.id)
 })
-
-// Inject the poker room state and actions with type safety
-const pokerRoom = inject(PokerRoomKey)
-if (!pokerRoom) throw new Error('PokerRoom not provided')
-
-const { roomState, isJoined, vote, myVote, votingComplete, averageVote, medianVote, consensusPercentage, setStoryTitle } = pokerRoom
 
 const selectedValue = ref<string | number | null>(null)
 const isEditingStory = ref(false)

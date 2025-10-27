@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { useVotingScale, type VotingScaleType } from '~/composables/useVotingScale'
+import { AVAILABLE_SCALES, VOTING_SCALES, type VotingScaleType } from '~/composables/useVotingScale'
+
+const props = defineProps<{
+  currentScaleId?: string
+}>()
 
 const emit = defineEmits<{
   (e: 'change', scaleType: VotingScaleType): void
 }>()
 
-const { currentScale, currentScaleType, availableScales, setScale } = useVotingScale()
 const isOpen = ref(false)
+const currentScaleType = computed(() => (props.currentScaleId || 'fibonacci') as VotingScaleType)
+const currentScale = computed(() => VOTING_SCALES[currentScaleType.value])
+const availableScales = AVAILABLE_SCALES
 
 function handleScaleChange(scaleType: VotingScaleType) {
-  setScale(scaleType)
   emit('change', scaleType)
   isOpen.value = false
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePokerRoom, PokerRoomKey } from '~/composables/usePokerRoom'
-import { useVotingScale, type VotingScaleType } from '~/composables/useVotingScale'
+import type { VotingScaleType } from '~/composables/useVotingScale'
 
 const route = useRoute()
 const roomId = route.params.id as string
@@ -21,25 +21,13 @@ const {
   leaveRoom,
   joinRoom,
   tryAutoRejoin,
-  setVotingScale: setRoomVotingScale,
+  setVotingScale,
 } = pokerRoom
 
-// Initialize voting scale composable
-const { setScale } = useVotingScale()
-
-// Handle scale changes
+// Handle scale changes - send to server, which will broadcast to all clients
 const handleScaleChange = (scaleType: VotingScaleType) => {
-  // Send to server
-  setRoomVotingScale(scaleType)
+  setVotingScale(scaleType)
 }
-
-// Sync room state scale with local composable
-// Only update if the scale is actually different to avoid overwriting user preference
-watch(() => roomState.value.votingScale, (newScale, oldScale) => {
-  if (newScale && newScale !== oldScale) {
-    setScale(newScale as VotingScaleType)
-  }
-})
 
 const showNameModal = ref(true)
 
@@ -113,7 +101,7 @@ watch(status, (newStatus) => {
 
           <div class="flex items-center gap-4">
             <!-- Voting Scale Selector -->
-            <VotingScaleSelector v-if="isJoined" @change="handleScaleChange" />
+            <VotingScaleSelector v-if="isJoined" :current-scale-id="roomState.votingScale" @change="handleScaleChange" />
 
             <!-- Theme Toggle -->
             <ThemeToggle />

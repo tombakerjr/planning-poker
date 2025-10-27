@@ -312,11 +312,15 @@ export class PokerRoom extends DurableObject {
           const currentScale = (roomState.votingScale || 'fibonacci') as ValidScale;
           const validValues = SCALE_VALUES[currentScale] || SCALE_VALUES['fibonacci'];
 
-          // Check if vote is in allowed values
-          if (!validValues.includes(message.vote)) {
+          // Convert to strings for comparison to handle mixed types (number vs string)
+          // Example: '½' (string) should match even if vote arrives as different type
+          const voteStr = String(message.vote);
+          const validValuesStr = validValues.map(v => String(v));
+
+          if (!validValuesStr.includes(voteStr)) {
             ws.send(JSON.stringify({
               type: "error",
-              payload: { message: "Invalid vote value for current scale" }
+              payload: { message: "Invalid vote value for current scale. The scale may have changed - please vote again." }
             }));
             return;
           }
