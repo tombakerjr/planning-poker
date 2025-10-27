@@ -22,6 +22,9 @@ const supportsNumericStats = computed(() => {
 const selectedValue = ref<string | number | null>(null)
 const isEditingStory = ref(false)
 const storyInput = ref('')
+const voteChanged = ref(false)
+const hasVotedBefore = ref(false)
+let voteChangeTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Watch for changes in our vote from the server
 watchEffect(() => {
@@ -37,11 +40,39 @@ function handleSelect(value: string | number) {
   }
 
   const newValue = selectedValue.value === value ? null : value
+  const isChangingVote = hasVotedBefore.value && selectedValue.value !== null
+
   selectedValue.value = newValue
+
+  // Track if this is a vote change (not the first vote)
+  if (isChangingVote && newValue !== null) {
+    voteChanged.value = true
+
+    // Clear existing timeout
+    if (voteChangeTimeout) {
+      clearTimeout(voteChangeTimeout)
+    }
+
+    // Hide the indicator after 3 seconds
+    voteChangeTimeout = setTimeout(() => {
+      voteChanged.value = false
+    }, 3000)
+  }
+
+  if (newValue !== null) {
+    hasVotedBefore.value = true
+  }
 
   // Send vote to server
   vote(newValue)
 }
+
+// Clean up timeout on unmount
+onBeforeUnmount(() => {
+  if (voteChangeTimeout) {
+    clearTimeout(voteChangeTimeout)
+  }
+})
 
 function startEditingStory() {
   if (!isJoined.value) return
@@ -150,6 +181,19 @@ function handleStoryKeydown(event: KeyboardEvent) {
       <p class="min-h-[48px] text-4xl font-bold text-blue-600 dark:text-blue-400 transition-colors duration-200">
         {{ selectedValue ?? '...' }}
       </p>
+      <!-- Vote changed indicator -->
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <p v-if="voteChanged" class="mt-2 inline-block rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 text-sm font-medium text-yellow-800 dark:text-yellow-300 transition-colors duration-200">
+          🔄 Vote changed
+        </p>
+      </Transition>
     </div>
 
     <!-- Voting status -->

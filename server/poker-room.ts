@@ -71,6 +71,7 @@ interface RoomStorage {
   votesRevealed: boolean;
   storyTitle: string;
   votingScale?: string; // fibonacci, modified-fibonacci, t-shirt, etc.
+  autoReveal?: boolean; // auto-reveal votes when everyone has voted
 }
 
 interface AuthMessage {
@@ -114,6 +115,11 @@ interface SetScaleMessage {
   scale: string;
 }
 
+interface SetAutoRevealMessage {
+  type: "setAutoReveal";
+  autoReveal: boolean;
+}
+
 type WebSocketMessage =
   | AuthMessage
   | JoinMessage
@@ -123,7 +129,8 @@ type WebSocketMessage =
   | PingMessage
   | PongMessage
   | SetStoryMessage
-  | SetScaleMessage;
+  | SetScaleMessage
+  | SetAutoRevealMessage;
 
 interface WebSocketMeta {
   userId: string;
@@ -327,6 +334,14 @@ export class PokerRoom extends DurableObject {
         }
 
         roomState.participants[userId].vote = message.vote;
+
+        // Auto-reveal: Check if all participants have voted and auto-reveal is enabled
+        if (roomState.autoReveal && !roomState.votesRevealed) {
+          const allVoted = this.checkAllVoted(roomState);
+          if (allVoted) {
+            roomState.votesRevealed = true;
+          }
+        }
         break;
       }
       case "reveal": {
@@ -406,6 +421,19 @@ export class PokerRoom extends DurableObject {
 
         // Reset reveal state since votes have been cleared
         roomState.votesRevealed = false;
+        break;
+      }
+      case "setAutoReveal": {
+        // Validate user has joined before setting auto-reveal
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Must join room before changing auto-reveal setting" }
+          }));
+          return;
+        }
+
+        roomState.autoReveal = message.autoReveal;
         break;
       }
     }
@@ -488,7 +516,19 @@ export class PokerRoom extends DurableObject {
       votesRevealed: false,
       storyTitle: "",
       votingScale: "fibonacci",
+      autoReveal: false,
     };
+  }
+
+  private checkAllVoted(roomState: RoomStorage): boolean {
+    const participantIds = Object.keys(roomState.participants);
+    if (participantIds.length === 0) return false;
+
+    // Check if all participants have voted (vote is not null)
+    return participantIds.every(id => {
+      const participant = roomState.participants[id];
+      return participant && participant.vote !== null;
+    });
   }
 
   private async setRoomState(state: RoomStorage) {
