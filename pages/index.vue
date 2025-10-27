@@ -35,10 +35,13 @@ function handleKeyPress(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-gray-100">
-    <header class="border-b border-gray-200 bg-white shadow-sm">
+  <div class="flex min-h-screen flex-col bg-gray-100 dark:bg-gray-900 transition-colors duration-200">
+    <header class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200">
       <div class="mx-auto max-w-screen-xl px-4 py-4 sm:px-6 lg:px-8">
-        <h1 class="text-2xl font-bold text-gray-900">Planning Poker</h1>
+        <div class="flex items-center justify-between">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Planning Poker</h1>
+          <ThemeToggle />
+        </div>
       </div>
     </header>
 
@@ -46,40 +49,40 @@ function handleKeyPress(event: KeyboardEvent) {
       <div class="w-full max-w-md">
         <!-- Welcome Section -->
         <div class="text-center mb-8">
-          <h2 class="text-3xl font-bold text-gray-900 mb-4">
+          <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4 transition-colors duration-200">
             Welcome to Planning Poker
           </h2>
-          <p class="text-lg text-gray-600 mb-2">
+          <p class="text-lg text-gray-600 dark:text-gray-300 mb-2 transition-colors duration-200">
             Estimate your user stories with your team
           </p>
-          <p class="text-sm text-gray-500">
+          <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">
             Create a room and invite your team to start planning together
           </p>
         </div>
 
         <!-- Create Room Form -->
-        <div class="rounded-lg bg-white p-6 shadow-lg">
-          <h3 class="text-xl font-semibold text-gray-800 mb-4">
+        <div class="rounded-lg bg-white dark:bg-gray-800 p-6 shadow-lg transition-colors duration-200">
+          <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4 transition-colors duration-200">
             Create a New Room
           </h3>
           
           <div class="space-y-4">
             <!-- Error Message -->
-            <div v-if="error" class="rounded-md bg-red-50 p-4">
+            <div v-if="error" class="rounded-md bg-red-50 dark:bg-red-900/30 p-4 transition-colors duration-200">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-red-400 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm text-red-800">{{ error }}</p>
+                  <p class="text-sm text-red-800 dark:text-red-200">{{ error }}</p>
                 </div>
                 <div class="ml-auto pl-3">
                   <div class="-mx-1.5 -my-1.5">
                     <button
                       @click="error = ''"
-                      class="inline-flex rounded-md bg-red-50 p-1.5 text-red-500 hover:bg-red-100"
+                      class="inline-flex rounded-md bg-red-50 dark:bg-red-900/30 p-1.5 text-red-500 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
                     >
                       <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
@@ -91,7 +94,7 @@ function handleKeyPress(event: KeyboardEvent) {
             </div>
 
             <div>
-              <label for="roomName" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="roomName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 transition-colors duration-200">
                 Room Name (Optional)
               </label>
               <input
@@ -99,7 +102,7 @@ function handleKeyPress(event: KeyboardEvent) {
                 v-model="roomName"
                 type="text"
                 placeholder="e.g., Sprint Planning - Team Alpha"
-                class="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-700 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-200"
                 @keypress="handleKeyPress"
                 :disabled="isCreating"
               />
@@ -108,7 +111,7 @@ function handleKeyPress(event: KeyboardEvent) {
             <button
               @click="createRoom"
               :disabled="isCreating"
-              class="w-full rounded-lg bg-blue-600 px-4 py-3 text-white font-semibold shadow-md transition-all duration-200 ease-in-out hover:bg-blue-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-white font-semibold shadow-md transition-all duration-200 ease-in-out hover:bg-blue-700 dark:hover:bg-blue-600 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span v-if="!isCreating">Create Room</span>
               <span v-else class="flex items-center justify-center">
@@ -124,34 +127,34 @@ function handleKeyPress(event: KeyboardEvent) {
 
         <!-- Features Section -->
         <div class="mt-8 text-center">
-          <h4 class="text-lg font-semibold text-gray-800 mb-4">Features</h4>
+          <h4 class="text-lg font-semibold text-gray-800 dark:text-white mb-4 transition-colors duration-200">Features</h4>
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div class="rounded-lg bg-white p-4 shadow">
+            <div class="rounded-lg bg-white dark:bg-gray-800 p-4 shadow transition-colors duration-200">
               <div class="text-2xl mb-2">🃏</div>
-              <h5 class="font-medium text-gray-800">Planning Cards</h5>
-              <p class="text-sm text-gray-600">Fibonacci sequence and custom values</p>
+              <h5 class="font-medium text-gray-800 dark:text-white transition-colors duration-200">Planning Cards</h5>
+              <p class="text-sm text-gray-600 dark:text-gray-300 transition-colors duration-200">Fibonacci sequence and custom values</p>
             </div>
-            <div class="rounded-lg bg-white p-4 shadow">
+            <div class="rounded-lg bg-white dark:bg-gray-800 p-4 shadow transition-colors duration-200">
               <div class="text-2xl mb-2">👥</div>
-              <h5 class="font-medium text-gray-800">Team Collaboration</h5>
-              <p class="text-sm text-gray-600">Real-time voting and discussion</p>
+              <h5 class="font-medium text-gray-800 dark:text-white transition-colors duration-200">Team Collaboration</h5>
+              <p class="text-sm text-gray-600 dark:text-gray-300 transition-colors duration-200">Real-time voting and discussion</p>
             </div>
-            <div class="rounded-lg bg-white p-4 shadow">
+            <div class="rounded-lg bg-white dark:bg-gray-800 p-4 shadow transition-colors duration-200">
               <div class="text-2xl mb-2">📊</div>
-              <h5 class="font-medium text-gray-800">Vote Tracking</h5>
-              <p class="text-sm text-gray-600">See who voted and reveal results</p>
+              <h5 class="font-medium text-gray-800 dark:text-white transition-colors duration-200">Vote Tracking</h5>
+              <p class="text-sm text-gray-600 dark:text-gray-300 transition-colors duration-200">See who voted and reveal results</p>
             </div>
-            <div class="rounded-lg bg-white p-4 shadow">
+            <div class="rounded-lg bg-white dark:bg-gray-800 p-4 shadow transition-colors duration-200">
               <div class="text-2xl mb-2">⚡</div>
-              <h5 class="font-medium text-gray-800">Fast & Simple</h5>
-              <p class="text-sm text-gray-600">No registration required</p>
+              <h5 class="font-medium text-gray-800 dark:text-white transition-colors duration-200">Fast & Simple</h5>
+              <p class="text-sm text-gray-600 dark:text-gray-300 transition-colors duration-200">No registration required</p>
             </div>
           </div>
         </div>
       </div>
     </main>
 
-    <footer class="py-4 text-center text-sm text-gray-500">
+    <footer class="py-4 text-center text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">
       <p>Start planning your next sprint with confidence</p>
     </footer>
   </div>

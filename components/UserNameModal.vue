@@ -44,19 +44,19 @@ const generateGuestName = () => {
 <template>
   <div
     v-if="show"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm transition-all duration-200"
     @click.self="handleClose"
   >
-    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-      <h2 class="mb-4 text-xl font-bold text-gray-900">
+    <div class="w-full max-w-md rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-colors duration-200">
+      <h2 class="mb-4 text-xl font-bold text-gray-900 dark:text-white transition-colors duration-200">
         Join Planning Poker Room
       </h2>
-      
+
       <form @submit.prevent="handleSubmit">
         <div class="mb-4">
           <label
             for="name"
-            class="mb-2 block text-sm font-medium text-gray-700"
+            class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors duration-200"
           >
             Your Name
           </label>
@@ -65,7 +65,7 @@ const generateGuestName = () => {
             v-model="name"
             type="text"
             placeholder="Enter your name"
-            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            class="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
             :disabled="isSubmitting"
             required
           >
@@ -75,7 +75,7 @@ const generateGuestName = () => {
           <button
             type="button"
             @click="generateGuestName"
-            class="text-sm text-blue-600 hover:text-blue-800"
+            class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200"
             :disabled="isSubmitting"
           >
             Generate random name
@@ -86,14 +86,14 @@ const generateGuestName = () => {
           <button
             type="button"
             @click="handleClose"
-            class="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
             :disabled="isSubmitting"
           >
             Cancel
           </button>
           <button
             type="submit"
-            class="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            class="flex-1 rounded-md bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 transition-colors duration-200"
             :disabled="!name.trim() || isSubmitting"
           >
             {{ isSubmitting ? 'Joining...' : 'Join Room' }}
