@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { usePokerRoom, PokerRoomKey } from '~/composables/usePokerRoom'
+import type { VotingScaleType } from '~/composables/useVotingScale'
 
 const route = useRoute()
 const roomId = route.params.id as string
@@ -20,7 +21,13 @@ const {
   leaveRoom,
   joinRoom,
   tryAutoRejoin,
+  setVotingScale,
 } = pokerRoom
+
+// Handle scale changes - send to server, which will broadcast to all clients
+const handleScaleChange = (scaleType: VotingScaleType) => {
+  setVotingScale(scaleType)
+}
 
 const showNameModal = ref(true)
 
@@ -93,6 +100,9 @@ watch(status, (newStatus) => {
           <h1 class="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">Planning Poker</h1>
 
           <div class="flex items-center gap-4">
+            <!-- Voting Scale Selector -->
+            <VotingScaleSelector v-if="isJoined" :current-scale-id="roomState.votingScale" @change="handleScaleChange" />
+
             <!-- Theme Toggle -->
             <ThemeToggle />
 

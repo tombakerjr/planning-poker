@@ -13,6 +13,7 @@ export interface RoomState {
   participants: Participant[]
   votesRevealed: boolean
   storyTitle: string
+  votingScale?: string
 }
 
 export interface RoomMessage {
@@ -33,6 +34,7 @@ export function usePokerRoom(roomId: string) {
     participants: [],
     votesRevealed: false,
     storyTitle: '',
+    votingScale: 'fibonacci',
   })
 
   const currentUser = ref<{ id: string; name: string } | null>(null)
@@ -83,6 +85,7 @@ export function usePokerRoom(roomId: string) {
             participants: message.payload.participants || [],
             votesRevealed: message.payload.votesRevealed || false,
             storyTitle: message.payload.storyTitle || '',
+            votingScale: message.payload.votingScale || 'fibonacci',
           }
         }
         break
@@ -266,6 +269,11 @@ export function usePokerRoom(roomId: string) {
 
     const numericVotes = roomState.value.participants
       .map(p => p.vote)
+      .map(vote => {
+        // Convert known string representations to numbers (e.g., '½' → 0.5)
+        if (vote === '½') return 0.5
+        return vote
+      })
       .filter((vote): vote is number => typeof vote === 'number')
 
     if (numericVotes.length === 0) return null
@@ -279,6 +287,11 @@ export function usePokerRoom(roomId: string) {
 
     const numericVotes = roomState.value.participants
       .map(p => p.vote)
+      .map(vote => {
+        // Convert known string representations to numbers (e.g., '½' → 0.5)
+        if (vote === '½') return 0.5
+        return vote
+      })
       .filter((vote): vote is number => typeof vote === 'number')
       .sort((a, b) => a - b)
 
@@ -286,9 +299,15 @@ export function usePokerRoom(roomId: string) {
 
     const mid = Math.floor(numericVotes.length / 2)
     if (numericVotes.length % 2 === 0) {
-      return Math.round(((numericVotes[mid - 1] + numericVotes[mid]) / 2) * 10) / 10
+      const val1 = numericVotes[mid - 1]
+      const val2 = numericVotes[mid]
+      if (val1 !== undefined && val2 !== undefined) {
+        return Math.round(((val1 + val2) / 2) * 10) / 10
+      }
+      return null
     }
-    return numericVotes[mid]
+    const medianVal = numericVotes[mid]
+    return medianVal !== undefined ? medianVal : null
   })
 
   const consensusPercentage = computed(() => {
@@ -478,6 +497,33 @@ export function usePokerRoom(roomId: string) {
     }
   }
 
+  const setVotingScale = async (scale: string) => {
+    if (!isJoined.value) {
+      toast.error('Must join room before changing voting scale')
+      return false
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      toast.error('Not connected to room')
+      return false
+    }
+
+    try {
+      ws.send(JSON.stringify({
+        type: 'setScale',
+        scale
+      }))
+
+      // Success feedback comes from UI update (cards change immediately)
+      // No optimistic toast to avoid misleading user if server rejects change
+      return true
+    } catch (error) {
+      logger.error('Failed to set voting scale:', error)
+      toast.error('Failed to change voting scale')
+      return false
+    }
+  }
+
   const leaveRoom = () => {
     closeConnection()
     currentUser.value = null
@@ -486,6 +532,7 @@ export function usePokerRoom(roomId: string) {
       participants: [],
       votesRevealed: false,
       storyTitle: '',
+      votingScale: 'fibonacci',
     }
     // Don't clear session on leave - keep it for potential rejoin
   }
@@ -522,6 +569,7 @@ export function usePokerRoom(roomId: string) {
     revealVotes,
     resetRound,
     setStoryTitle,
+    setVotingScale,
   }
 }
 
