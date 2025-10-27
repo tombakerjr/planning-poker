@@ -40,16 +40,31 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Please review this pull request and provide feedback on:
+            Review this PR as a senior engineer would. Be thorough but concise.
+
+            **Context:**
+            - Read CLAUDE.md for project conventions and architecture
+            - Check .serena/memories/ for additional codebase context (even without Serena MCP server)
+            - Review IMPLEMENTATION_PLAN.md to understand current phase and goals
+
+            **Review areas:**
+            - Security vulnerabilities (XSS, injection, auth bypass, secrets)
+            - Critical bugs (data loss, crashes, logic errors)
             - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            - Performance issues
+            - Test coverage gaps
+            - Breaking changes
+            - Adherence to CLAUDE.md conventions
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            **Communication style:**
+            - Prefer brevity: bullet points, direct feedback
+            - Verbose explanations are acceptable when necessary for clarity or complex issues
+            - Group related issues together
+            - Prioritize: Critical > Important > Nice-to-have
+            - Skip trivial style issues unless pattern violations
+            - If clean: "✅ No significant issues found"
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            Post your review as a comment on the PR using `gh pr comment`.
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options

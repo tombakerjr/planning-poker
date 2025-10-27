@@ -159,6 +159,25 @@ The `usePokerRoom` composable handles:
 
 ## Development Workflow
 
+### ⚠️ IMPORTANT: Branch Protection Rules
+
+**Branch protection is enabled on `main`:**
+- ✅ Pull requests are REQUIRED for all changes
+- ❌ Direct pushes to `main` are BLOCKED
+- ✅ All automated checks must pass before merging
+- ✅ Human review required before merge
+
+**This applies to ALL Claude Code sessions:**
+- Local development
+- Web interface
+- GitHub Actions
+- Any automated workflows
+
+**Never attempt to:**
+- Commit directly to `main`
+- Push to `main` without a PR
+- Merge without passing checks
+
 ### Standard GitHub Issue Workflow
 
 When working on a GitHub issue, follow this standardized process:
@@ -194,8 +213,8 @@ When working on a GitHub issue, follow this standardized process:
    ```
 
 6. **Wait for automated checks** (2-3 minutes)
-   - Claude Code review comments
-   - Cloudflare deployment check
+   - **Claude Code Review**: Comprehensive senior-level review (security, bugs, quality, performance, tests). Comments posted to PR are concise and prioritized.
+   - **Cloudflare deployment check**: Verifies build succeeds
 
 7. **Review and address feedback**
    - Check Claude Code review comments
@@ -203,9 +222,11 @@ When working on a GitHub issue, follow this standardized process:
    - Address any critical issues found
    - Push additional commits if needed
 
-8. **Wait for human review**
+8. **Wait for human review and merge**
    - PR is ready for final review
-   - Wait for approval and merge
+   - Wait for approval from human reviewer
+   - Human reviewer or automated workflow will merge PR
+   - Never attempt to merge directly (branch protection enforced)
 
 ### Creating a New Room Feature
 
