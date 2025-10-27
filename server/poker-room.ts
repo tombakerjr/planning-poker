@@ -146,6 +146,7 @@ export class PokerRoom extends DurableObject {
   private heartbeatIntervals = new Map<WebSocket, number>();
   private rateLimits = new Map<WebSocket, RateLimitInfo>();
   private broadcastDebounceTimeout?: number;
+  private autoRevealTimeout?: number;
 
   override async fetch(request: Request): Promise<Response> {
     // Handle WebSocket upgrade requests
@@ -274,12 +275,18 @@ export class PokerRoom extends DurableObject {
     // Clean up rate limit info
     this.rateLimits.delete(ws);
 
-    // Clean up debounce timeout if no more connections
+    // Clean up timeouts if no more connections
     // This prevents memory leaks when the last client disconnects
     const remainingConnections = this.ctx.getWebSockets().length;
-    if (remainingConnections === 0 && this.broadcastDebounceTimeout) {
-      clearTimeout(this.broadcastDebounceTimeout);
-      this.broadcastDebounceTimeout = undefined;
+    if (remainingConnections === 0) {
+      if (this.broadcastDebounceTimeout) {
+        clearTimeout(this.broadcastDebounceTimeout);
+        this.broadcastDebounceTimeout = undefined;
+      }
+      if (this.autoRevealTimeout) {
+        clearTimeout(this.autoRevealTimeout);
+        this.autoRevealTimeout = undefined;
+      }
     }
   }
 
@@ -336,10 +343,25 @@ export class PokerRoom extends DurableObject {
         roomState.participants[userId].vote = message.vote;
 
         // Auto-reveal: Check if all participants have voted and auto-reveal is enabled
+        // Add 150ms delay to prevent race condition where last voter doesn't see their vote
         if (roomState.autoReveal && !roomState.votesRevealed) {
           const allVoted = this.checkAllVoted(roomState);
           if (allVoted) {
-            roomState.votesRevealed = true;
+            // Clear any existing auto-reveal timeout
+            if (this.autoRevealTimeout) {
+              clearTimeout(this.autoRevealTimeout);
+            }
+
+            // Schedule auto-reveal with delay
+            this.autoRevealTimeout = setTimeout(async () => {
+              const currentState = await this.getRoomState();
+              if (currentState.autoReveal && !currentState.votesRevealed && this.checkAllVoted(currentState)) {
+                currentState.votesRevealed = true;
+                await this.setRoomState(currentState);
+                this.scheduleBroadcast();
+              }
+              this.autoRevealTimeout = undefined;
+            }, 150) as unknown as number;
           }
         }
         break;
@@ -353,6 +375,13 @@ export class PokerRoom extends DurableObject {
           }));
           return;
         }
+
+        // Clear any pending auto-reveal timeout since manual reveal was triggered
+        if (this.autoRevealTimeout) {
+          clearTimeout(this.autoRevealTimeout);
+          this.autoRevealTimeout = undefined;
+        }
+
         roomState.votesRevealed = true;
         break;
       }
@@ -365,6 +394,13 @@ export class PokerRoom extends DurableObject {
           }));
           return;
         }
+
+        // Clear any pending auto-reveal timeout
+        if (this.autoRevealTimeout) {
+          clearTimeout(this.autoRevealTimeout);
+          this.autoRevealTimeout = undefined;
+        }
+
         roomState.votesRevealed = false;
         for (const id in roomState.participants) {
           const participant = roomState.participants[id];
@@ -405,6 +441,12 @@ export class PokerRoom extends DurableObject {
             payload: { message: "Invalid voting scale type" }
           }));
           return;
+        }
+
+        // Clear any pending auto-reveal timeout since votes will be cleared
+        if (this.autoRevealTimeout) {
+          clearTimeout(this.autoRevealTimeout);
+          this.autoRevealTimeout = undefined;
         }
 
         // Update voting scale and clear all votes

@@ -24,12 +24,12 @@ const isEditingStory = ref(false)
 const storyInput = ref('')
 const voteChanged = ref(false)
 const hasVotedBefore = ref(false)
-let voteChangeTimeout: ReturnType<typeof setTimeout> | null = null
+const voteChangeTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
-// Watch for changes in our vote from the server
-watchEffect(() => {
-  if (myVote.value) {
-    selectedValue.value = myVote.value
+// Watch for changes in our vote from the server (sync selected value with server state)
+watch(myVote, (newVote) => {
+  if (newVote) {
+    selectedValue.value = newVote
   }
 })
 
@@ -44,17 +44,18 @@ function handleSelect(value: string | number) {
 
   selectedValue.value = newValue
 
-  // Track if this is a vote change (not the first vote)
-  if (isChangingVote && newValue !== null) {
+  // Track if this is a vote change (not the first vote or revote after unvote)
+  // Show indicator when: changing from one vote to another, OR revoting after clearing
+  if (newValue !== null && hasVotedBefore.value) {
     voteChanged.value = true
 
     // Clear existing timeout
-    if (voteChangeTimeout) {
-      clearTimeout(voteChangeTimeout)
+    if (voteChangeTimeout.value) {
+      clearTimeout(voteChangeTimeout.value)
     }
 
     // Hide the indicator after 3 seconds
-    voteChangeTimeout = setTimeout(() => {
+    voteChangeTimeout.value = setTimeout(() => {
       voteChanged.value = false
     }, 3000)
   }
@@ -69,8 +70,8 @@ function handleSelect(value: string | number) {
 
 // Clean up timeout on unmount
 onBeforeUnmount(() => {
-  if (voteChangeTimeout) {
-    clearTimeout(voteChangeTimeout)
+  if (voteChangeTimeout.value) {
+    clearTimeout(voteChangeTimeout.value)
   }
 })
 
