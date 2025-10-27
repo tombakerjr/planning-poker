@@ -388,8 +388,17 @@ export class PokerRoom extends DurableObject {
           return;
         }
 
-        // Update voting scale
+        // Update voting scale and clear all votes
+        // Existing votes may be invalid on the new scale (e.g., "21" on Fibonacci → T-shirt sizes)
         roomState.votingScale = message.scale;
+
+        // Clear all participant votes to prevent data corruption
+        Object.keys(roomState.participants).forEach(participantId => {
+          roomState.participants[participantId].vote = null;
+        });
+
+        // Reset reveal state since votes have been cleared
+        roomState.votesRevealed = false;
         break;
       }
     }

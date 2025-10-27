@@ -269,6 +269,11 @@ export function usePokerRoom(roomId: string) {
 
     const numericVotes = roomState.value.participants
       .map(p => p.vote)
+      .map(vote => {
+        // Convert known string representations to numbers (e.g., '½' → 0.5)
+        if (vote === '½') return 0.5
+        return vote
+      })
       .filter((vote): vote is number => typeof vote === 'number')
 
     if (numericVotes.length === 0) return null
@@ -282,6 +287,11 @@ export function usePokerRoom(roomId: string) {
 
     const numericVotes = roomState.value.participants
       .map(p => p.vote)
+      .map(vote => {
+        // Convert known string representations to numbers (e.g., '½' → 0.5)
+        if (vote === '½') return 0.5
+        return vote
+      })
       .filter((vote): vote is number => typeof vote === 'number')
       .sort((a, b) => a - b)
 
@@ -498,7 +508,8 @@ export function usePokerRoom(roomId: string) {
         scale
       }))
 
-      toast.success('Voting scale updated!')
+      // Success feedback comes from UI update (cards change immediately)
+      // No optimistic toast to avoid misleading user if server rejects change
       return true
     } catch (error) {
       logger.error('Failed to set voting scale:', error)

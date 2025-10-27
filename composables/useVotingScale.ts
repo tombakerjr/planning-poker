@@ -128,6 +128,12 @@ export function useVotingScale() {
 
   // Set the current voting scale
   const setScale = (scaleType: VotingScaleType, customVals?: (string | number)[]) => {
+    // Only update and save if scale actually changed to prevent unnecessary localStorage writes
+    if (currentScaleType.value === scaleType &&
+        !(scaleType === 'custom' && customVals && JSON.stringify(customValues.value) !== JSON.stringify(customVals))) {
+      return
+    }
+
     currentScaleType.value = scaleType
     if (scaleType === 'custom' && customVals) {
       customValues.value = customVals
