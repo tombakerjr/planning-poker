@@ -27,9 +27,21 @@ const hasVotedBefore = ref(false)
 const voteChangeTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
 // Watch for changes in our vote from the server (sync selected value with server state)
+// Always sync, even when null (handles vote clearing)
 watch(myVote, (newVote) => {
-  if (newVote) {
-    selectedValue.value = newVote
+  selectedValue.value = newVote
+})
+
+// Reset vote change tracking when round resets
+watch(() => roomState.value.votesRevealed, (newRevealed, oldRevealed) => {
+  // When transitioning from revealed to not revealed (round reset)
+  if (oldRevealed && !newRevealed) {
+    hasVotedBefore.value = false
+    voteChanged.value = false
+    if (voteChangeTimeout.value) {
+      clearTimeout(voteChangeTimeout.value)
+      voteChangeTimeout.value = null
+    }
   }
 })
 
@@ -40,7 +52,6 @@ function handleSelect(value: string | number) {
   }
 
   const newValue = selectedValue.value === value ? null : value
-  const isChangingVote = hasVotedBefore.value && selectedValue.value !== null
 
   selectedValue.value = newValue
 

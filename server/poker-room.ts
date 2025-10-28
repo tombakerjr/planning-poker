@@ -49,6 +49,9 @@ const MAX_MESSAGES_PER_SECOND = 10;
 const RATE_LIMIT_WINDOW_MS = 1000; // 1 second
 const MAX_CONNECTIONS_PER_DO = 100;
 
+// Auto-reveal delay to prevent race condition where last voter doesn't see their vote
+const AUTO_REVEAL_DELAY_MS = 150;
+
 // Voting scale definitions (must match client-side definitions)
 const VALID_SCALES = ['fibonacci', 'modified-fibonacci', 't-shirt', 'powers-of-2', 'linear'] as const;
 type ValidScale = typeof VALID_SCALES[number];
@@ -343,7 +346,6 @@ export class PokerRoom extends DurableObject {
         roomState.participants[userId].vote = message.vote;
 
         // Auto-reveal: Check if all participants have voted and auto-reveal is enabled
-        // Add 150ms delay to prevent race condition where last voter doesn't see their vote
         if (roomState.autoReveal && !roomState.votesRevealed) {
           const allVoted = this.checkAllVoted(roomState);
           if (allVoted) {
@@ -352,16 +354,20 @@ export class PokerRoom extends DurableObject {
               clearTimeout(this.autoRevealTimeout);
             }
 
-            // Schedule auto-reveal with delay
+            // Schedule auto-reveal with delay to prevent race condition
+            // Use closure to capture current state and only modify votesRevealed flag
             this.autoRevealTimeout = setTimeout(async () => {
-              const currentState = await this.getRoomState();
-              if (currentState.autoReveal && !currentState.votesRevealed && this.checkAllVoted(currentState)) {
-                currentState.votesRevealed = true;
-                await this.setRoomState(currentState);
+              // Re-fetch state to check if conditions still hold
+              // But don't use it to overwrite the entire state
+              const latestState = await this.getRoomState();
+              if (latestState.autoReveal && !latestState.votesRevealed && this.checkAllVoted(latestState)) {
+                // Only update the votesRevealed flag, preserving all other concurrent changes
+                latestState.votesRevealed = true;
+                await this.setRoomState(latestState);
                 this.scheduleBroadcast();
               }
               this.autoRevealTimeout = undefined;
-            }, 150) as unknown as number;
+            }, AUTO_REVEAL_DELAY_MS) as unknown as number;
           }
         }
         break;
