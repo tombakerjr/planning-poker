@@ -22,11 +22,17 @@ const {
   joinRoom,
   tryAutoRejoin,
   setVotingScale,
+  setAutoReveal,
 } = pokerRoom
 
 // Handle scale changes - send to server, which will broadcast to all clients
 const handleScaleChange = (scaleType: VotingScaleType) => {
   setVotingScale(scaleType)
+}
+
+// Handle auto-reveal toggle
+const handleAutoRevealChange = (value: boolean) => {
+  setAutoReveal(value)
 }
 
 const showNameModal = ref(true)
@@ -100,6 +106,13 @@ watch(status, (newStatus) => {
           <h1 class="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">Planning Poker</h1>
 
           <div class="flex items-center gap-4">
+            <!-- Auto-Reveal Toggle -->
+            <AutoRevealToggle
+              v-if="isJoined"
+              :auto-reveal="roomState.autoReveal || false"
+              @update:auto-reveal="handleAutoRevealChange"
+            />
+
             <!-- Voting Scale Selector -->
             <VotingScaleSelector v-if="isJoined" :current-scale-id="roomState.votingScale" @change="handleScaleChange" />
 
