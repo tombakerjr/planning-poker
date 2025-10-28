@@ -345,27 +345,34 @@ export class PokerRoom extends DurableObject {
           }
         }
 
+        // Update vote in state
         roomState.participants[userId].vote = message.vote;
 
-        // Auto-reveal: Check if all participants have voted and auto-reveal is enabled
-        if (roomState.autoReveal && !roomState.votesRevealed) {
-          const allVoted = this.checkAllVoted(roomState);
-          if (allVoted) {
-            // Clear any existing auto-reveal timeout
-            if (this.autoRevealTimeout) {
-              clearTimeout(this.autoRevealTimeout);
-            }
+        // CRITICAL: Persist state FIRST before checking auto-reveal conditions
+        // This prevents race conditions where multiple votes check stale state
+        await this.setRoomState(roomState);
+        this.scheduleBroadcast();
 
-            // Schedule auto-reveal with delay to prevent race where last voter doesn't see their vote
-            this.autoRevealTimeout = setTimeout(() => {
-              this.tryAutoReveal().catch(err => {
-                logger.error("Auto-reveal failed:", err);
-              });
-              this.autoRevealTimeout = undefined;
-            }, AUTO_REVEAL_DELAY_MS) as unknown as number;
+        // Auto-reveal: Check if all participants have voted and auto-reveal is enabled
+        // Re-fetch state to ensure we're checking persisted data (prevents race conditions)
+        const currentState = await this.getRoomState();
+        if (currentState.autoReveal && !currentState.votesRevealed && this.checkAllVoted(currentState)) {
+          // Clear any existing auto-reveal timeout
+          if (this.autoRevealTimeout) {
+            clearTimeout(this.autoRevealTimeout);
           }
+
+          // Schedule auto-reveal with delay to prevent race where last voter doesn't see their vote
+          this.autoRevealTimeout = setTimeout(() => {
+            this.tryAutoReveal().catch(err => {
+              logger.error("Auto-reveal failed:", err);
+            });
+            this.autoRevealTimeout = undefined;
+          }, AUTO_REVEAL_DELAY_MS) as unknown as number;
         }
-        break;
+
+        // Early return since we've already persisted and broadcasted
+        return;
       }
       case "reveal": {
         // Validate user has joined before revealing

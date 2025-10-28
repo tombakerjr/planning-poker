@@ -55,9 +55,11 @@ function handleSelect(value: string | number) {
 
   selectedValue.value = newValue
 
-  // Track if this is a vote change (not the first vote or revote after unvote)
-  // Show indicator when: changing from one vote to another, OR revoting after clearing
-  if (newValue !== null && hasVotedBefore.value) {
+  // Handle unvote: reset tracking state
+  if (newValue === null) {
+    hasVotedBefore.value = false
+  } else if (hasVotedBefore.value) {
+    // Track vote changes (not the first vote)
     voteChanged.value = true
 
     // Clear existing timeout
@@ -71,6 +73,7 @@ function handleSelect(value: string | number) {
     }, 3000)
   }
 
+  // Set flag after first vote
   if (newValue !== null) {
     hasVotedBefore.value = true
   }
@@ -207,7 +210,7 @@ function handleStoryKeydown(event: KeyboardEvent) {
         leave-to-class="opacity-0 scale-95"
       >
         <p v-if="voteChanged" class="mt-2 inline-block rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 text-sm font-medium text-yellow-800 dark:text-yellow-300 transition-colors duration-200">
-          🔄 Vote changed
+          Vote changed
         </p>
       </Transition>
     </div>
