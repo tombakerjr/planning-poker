@@ -49,7 +49,9 @@ const MAX_MESSAGES_PER_SECOND = 10;
 const RATE_LIMIT_WINDOW_MS = 1000; // 1 second
 const MAX_CONNECTIONS_PER_DO = 100;
 
-// Auto-reveal delay to prevent race condition where last voter doesn't see their vote
+// Auto-reveal delay prevents race where last voter doesn't see their vote update
+// before reveal. 150ms balances UX (fast reveal) with reliability (WebSocket latency + React render).
+// Without delay, the last voter's UI may not update before votes are revealed.
 const AUTO_REVEAL_DELAY_MS = 150;
 
 // Voting scale definitions (must match client-side definitions)
@@ -354,18 +356,11 @@ export class PokerRoom extends DurableObject {
               clearTimeout(this.autoRevealTimeout);
             }
 
-            // Schedule auto-reveal with delay to prevent race condition
-            // Use closure to capture current state and only modify votesRevealed flag
-            this.autoRevealTimeout = setTimeout(async () => {
-              // Re-fetch state to check if conditions still hold
-              // But don't use it to overwrite the entire state
-              const latestState = await this.getRoomState();
-              if (latestState.autoReveal && !latestState.votesRevealed && this.checkAllVoted(latestState)) {
-                // Only update the votesRevealed flag, preserving all other concurrent changes
-                latestState.votesRevealed = true;
-                await this.setRoomState(latestState);
-                this.scheduleBroadcast();
-              }
+            // Schedule auto-reveal with delay to prevent race where last voter doesn't see their vote
+            this.autoRevealTimeout = setTimeout(() => {
+              this.tryAutoReveal().catch(err => {
+                logger.error("Auto-reveal failed:", err);
+              });
               this.autoRevealTimeout = undefined;
             }, AUTO_REVEAL_DELAY_MS) as unknown as number;
           }
@@ -481,6 +476,15 @@ export class PokerRoom extends DurableObject {
           return;
         }
 
+        // Validate autoReveal is a boolean
+        if (typeof message.autoReveal !== 'boolean') {
+          ws.send(JSON.stringify({
+            type: "error",
+            payload: { message: "Invalid auto-reveal value" }
+          }));
+          return;
+        }
+
         roomState.autoReveal = message.autoReveal;
         break;
       }
@@ -495,11 +499,16 @@ export class PokerRoom extends DurableObject {
     delete roomState.participants[userId];
     await this.setRoomState(roomState);
 
-    // If no participants remain, clean up the debounce timeout immediately
-    // to free resources faster
-    if (Object.keys(roomState.participants).length === 0 && this.broadcastDebounceTimeout) {
-      clearTimeout(this.broadcastDebounceTimeout);
-      this.broadcastDebounceTimeout = undefined;
+    // If no participants remain, clean up all timeouts immediately to free resources
+    if (Object.keys(roomState.participants).length === 0) {
+      if (this.broadcastDebounceTimeout) {
+        clearTimeout(this.broadcastDebounceTimeout);
+        this.broadcastDebounceTimeout = undefined;
+      }
+      if (this.autoRevealTimeout) {
+        clearTimeout(this.autoRevealTimeout);
+        this.autoRevealTimeout = undefined;
+      }
       // Still broadcast the final state showing empty room
       await this.broadcastState();
     } else {
@@ -581,6 +590,27 @@ export class PokerRoom extends DurableObject {
 
   private async setRoomState(state: RoomStorage) {
     await this.ctx.storage.put("state", state);
+  }
+
+  /**
+   * Atomically reveal votes if conditions are met.
+   * Minimizes race condition window by doing read-check-write in tight sequence.
+   * Note: There's still a small race window between read and write where concurrent
+   * changes could be lost. This is a limitation of the current architecture.
+   */
+  private async tryAutoReveal(): Promise<void> {
+    // Read current state
+    const state = await this.getRoomState();
+
+    // Check conditions - if they don't hold, do nothing
+    if (!state.autoReveal || state.votesRevealed || !this.checkAllVoted(state)) {
+      return;
+    }
+
+    // Modify and write back immediately to minimize race window
+    state.votesRevealed = true;
+    await this.setRoomState(state);
+    this.scheduleBroadcast();
   }
 
   private startHeartbeat(ws: WebSocket) {

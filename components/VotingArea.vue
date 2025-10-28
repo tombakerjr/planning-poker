@@ -79,11 +79,15 @@ function handleSelect(value: string | number) {
   vote(newValue)
 }
 
-// Clean up timeout on unmount
+// Clean up timeout and state on unmount
 onBeforeUnmount(() => {
   if (voteChangeTimeout.value) {
     clearTimeout(voteChangeTimeout.value)
+    voteChangeTimeout.value = null
   }
+  // Clear state to prevent stale data if component remounts
+  voteChanged.value = false
+  hasVotedBefore.value = false
 })
 
 function startEditingStory() {
