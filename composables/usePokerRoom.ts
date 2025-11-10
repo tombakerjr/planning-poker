@@ -20,12 +20,29 @@ export interface RoomState {
 export interface RoomMessage {
   type: 'update' | 'error' | 'ping' | 'pong'
   payload?: any
+  id?: number  // For ping/pong latency measurement
 }
 
-const MAX_RECONNECT_ATTEMPTS = 10
+export interface QueuedMessage {
+  message: any
+  timestamp: number
+  action: 'vote' | 'setStory' | 'setScale' | 'setAutoReveal'
+}
+
+export type ConnectionQuality = 'good' | 'fair' | 'poor' | 'disconnected'
+export type NetworkState = 'online' | 'offline' | 'unstable'
+
+const MAX_RECONNECT_ATTEMPTS = 15  // Increased for flaky connections
+const MAX_RECONNECT_DELAY_MS = 60000  // 60 seconds max delay
+const BASE_DELAY_MS = 1000  // 1 second base delay
+const JITTER_FACTOR = 0.3  // ±30% randomization
 const HEARTBEAT_INTERVAL_MS = 25000 // 25 seconds (less than server's 30s)
+const HEARTBEAT_TIMEOUT_MS = 35000  // 35 seconds (allow 1 missed heartbeat)
+const MAX_MISSED_PONGS = 2  // Force reconnect after 2 missed pongs
 const MAX_NAME_LENGTH = 50
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
+const MAX_QUEUE_SIZE = 10
+const MAX_MESSAGE_AGE_MS = 15000  // 15 seconds
 const IS_DEV = process.env.NODE_ENV === 'development'
 
 export function usePokerRoom(roomId: string) {
@@ -41,13 +58,120 @@ export function usePokerRoom(roomId: string) {
 
   const currentUser = ref<{ id: string; name: string } | null>(null)
   const isJoined = ref(false)
-  const status = ref<'CONNECTING' | 'OPEN' | 'CLOSED' | 'RECONNECTING'>('CLOSED')
+  const status = ref<'CONNECTING' | 'OPEN' | 'CLOSED' | 'RECONNECTING' | 'OFFLINE'>('CLOSED')
   const isLoading = ref(false)
+
+  // Connection quality monitoring
+  const latencyMeasurements = ref<number[]>([])
+  const currentLatency = ref<number | null>(null)
+  const connectionQuality = ref<ConnectionQuality>('disconnected')
+  const networkState = ref<NetworkState>('online')
+  const lastSuccessfulPong = ref<number>(Date.now())
+  const missedPongs = ref<number>(0)
+
+  // Message queue
+  const messageQueue = ref<QueuedMessage[]>([])
 
   let ws: WebSocket | null = null
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
   let reconnectAttempts = 0
+  let pingId = 0
+  let pingTimestamps = new Map<number, number>()
+
+  // Connection quality calculation
+  function calculateQuality(measurements: number[]): ConnectionQuality {
+    if (measurements.length === 0) return 'disconnected'
+
+    const avgLatency = measurements.reduce((a, b) => a + b, 0) / measurements.length
+
+    // Calculate jitter (standard deviation)
+    const variance = measurements.reduce((sum, val) =>
+      sum + Math.pow(val - avgLatency, 2), 0) / measurements.length
+    const jitter = Math.sqrt(variance)
+
+    // Good: Low latency AND stable
+    if (avgLatency < 200 && jitter < 50) return 'good'
+
+    // Poor: High latency OR very unstable
+    if (avgLatency > 500 || jitter > 150) return 'poor'
+
+    // Fair: Everything in between
+    return 'fair'
+  }
+
+  // Message queue management
+  function queueMessage(message: any, action: QueuedMessage['action']): boolean {
+    // Don't queue if connection is open
+    if (ws?.readyState === WebSocket.OPEN) return false
+
+    // Remove stale messages (>15s old)
+    messageQueue.value = messageQueue.value.filter(
+      m => Date.now() - m.timestamp < MAX_MESSAGE_AGE_MS
+    )
+
+    // For votes: replace existing queued vote (deduplication)
+    if (action === 'vote') {
+      messageQueue.value = messageQueue.value.filter(m => m.action !== 'vote')
+    }
+
+    // Check size limit
+    if (messageQueue.value.length >= MAX_QUEUE_SIZE) {
+      toast.warning('Message queue full. Please wait for reconnection.')
+      return false
+    }
+
+    // Add to queue
+    messageQueue.value.push({ message, timestamp: Date.now(), action })
+    toast.info(`Message queued. Will send when reconnected. (${messageQueue.value.length} queued)`)
+    return true
+  }
+
+  async function flushMessageQueue() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+
+    // Remove stale messages before flushing
+    const validMessages = messageQueue.value.filter(
+      m => Date.now() - m.timestamp < MAX_MESSAGE_AGE_MS
+    )
+
+    const expiredCount = messageQueue.value.length - validMessages.length
+
+    // Send each queued message
+    for (const queued of validMessages) {
+      try {
+        ws.send(JSON.stringify(queued.message))
+        await new Promise(resolve => setTimeout(resolve, 100)) // 100ms delay between sends
+      } catch (error) {
+        logger.error('Failed to flush queued message:', error)
+      }
+    }
+
+    // Clear queue after flush
+    messageQueue.value = []
+
+    // User feedback
+    if (validMessages.length > 0) {
+      toast.success(`Reconnected! Sent ${validMessages.length} queued message(s).`)
+    }
+    if (expiredCount > 0) {
+      toast.info(`${expiredCount} stale message(s) discarded.`)
+    }
+  }
+
+  function calculateReconnectDelay(attempt: number): number {
+    // Exponential: 1s, 2s, 4s, 8s, 16s, 32s, 60s, 60s...
+    const exponentialDelay = Math.min(
+      BASE_DELAY_MS * Math.pow(2, attempt),
+      MAX_RECONNECT_DELAY_MS
+    )
+
+    // Add jitter to prevent thundering herd
+    const jitter = exponentialDelay * JITTER_FACTOR * (Math.random() - 0.5) * 2
+    const delayWithJitter = exponentialDelay + jitter
+
+    return Math.max(BASE_DELAY_MS, delayWithJitter)  // Never less than 1s
+  }
 
   // Try to restore user session from localStorage
   const getUserSession = () => {
@@ -101,7 +225,32 @@ export function usePokerRoom(roomId: string) {
         break
 
       case 'pong':
-        // Server acknowledged our ping
+        // Server acknowledged our ping - measure latency
+        if (message.id !== undefined) {
+          const pingTimestamp = pingTimestamps.get(message.id)
+          if (pingTimestamp) {
+            const rtt = Date.now() - pingTimestamp
+            currentLatency.value = rtt
+            latencyMeasurements.value.push(rtt)
+
+            // Keep only last 3 measurements
+            if (latencyMeasurements.value.length > 3) {
+              latencyMeasurements.value.shift()
+            }
+
+            // Update connection quality
+            connectionQuality.value = calculateQuality(latencyMeasurements.value)
+
+            pingTimestamps.delete(message.id)
+          }
+        }
+
+        // Track successful pong for network state detection
+        lastSuccessfulPong.value = Date.now()
+        missedPongs.value = 0
+        if (networkState.value === 'unstable') {
+          networkState.value = 'online'
+        }
         break
 
       case 'error':
@@ -113,6 +262,58 @@ export function usePokerRoom(roomId: string) {
         logger.warn('Unknown message type:', message.type)
     }
   }
+
+  // Network state detection with browser events
+  function setupNetworkListeners() {
+    if (!process.client) return
+
+    let onlineDebounce: ReturnType<typeof setTimeout> | null = null
+    let offlineDebounce: ReturnType<typeof setTimeout> | null = null
+
+    const handleOnline = () => {
+      // Debounce to prevent flickering on rapid transitions
+      if (onlineDebounce) clearTimeout(onlineDebounce)
+      onlineDebounce = setTimeout(() => {
+        if (IS_DEV) {
+          logger.debug('Browser detected online')
+        }
+        networkState.value = 'online'
+
+        // Trigger reconnection if we're not connected
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          toast.info('Network restored. Reconnecting...')
+          connectToRoom()
+        }
+      }, 500)
+    }
+
+    const handleOffline = () => {
+      if (offlineDebounce) clearTimeout(offlineDebounce)
+      offlineDebounce = setTimeout(() => {
+        if (IS_DEV) {
+          logger.debug('Browser detected offline')
+        }
+        networkState.value = 'offline'
+        status.value = 'OFFLINE'
+        connectionQuality.value = 'disconnected'
+        toast.warning('Network connection lost')
+      }, 500)
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    // Cleanup on unmount
+    onUnmounted(() => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      if (onlineDebounce) clearTimeout(onlineDebounce)
+      if (offlineDebounce) clearTimeout(offlineDebounce)
+    })
+  }
+
+  // Setup network listeners
+  setupNetworkListeners()
 
   // WebSocket connection functions
   const connectToRoom = () => {
@@ -163,6 +364,9 @@ export function usePokerRoom(roomId: string) {
 
         // Start heartbeat
         startHeartbeat()
+
+        // Flush any queued messages
+        await flushMessageQueue()
       }
 
       ws.onmessage = (event) => {
@@ -189,21 +393,28 @@ export function usePokerRoom(roomId: string) {
           if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             logger.error('Max reconnection attempts reached. Please refresh the page.')
             status.value = 'CLOSED'
-            toast.error('Connection lost. Please refresh the page to reconnect.', 10000)
+            networkState.value = 'offline'
+            connectionQuality.value = 'disconnected'
+            toast.error('Unable to reconnect. Please refresh the page.', 15000)
             return
           }
 
           status.value = 'RECONNECTING'
+          connectionQuality.value = 'disconnected'
 
-          // Exponential backoff: 1s, 2s, 4s, 8s, ... up to 30s
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
+          // Calculate delay with jitter
+          const delay = calculateReconnectDelay(reconnectAttempts)
           if (IS_DEV) {
-            logger.debug(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+            logger.debug(`Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
           }
 
-          // Show reconnection toast
+          // Progressive toast messages
           if (reconnectAttempts === 0) {
-            toast.warning('Connection lost. Attempting to reconnect...', delay + 1000)
+            toast.warning('Connection lost. Reconnecting...', delay + 1000)
+          } else if (reconnectAttempts === 5) {
+            toast.warning('Still reconnecting... This may take a moment.', delay + 1000)
+          } else if (reconnectAttempts >= 10) {
+            toast.error('Connection issues persist. Check your network.', delay + 1000)
           }
 
           reconnectTimeout = setTimeout(() => {
@@ -237,10 +448,31 @@ export function usePokerRoom(roomId: string) {
 
   const startHeartbeat = () => {
     stopHeartbeat()
-    // Send ping to keep connection alive
+    // Send ping to keep connection alive and measure latency
     heartbeatInterval = setInterval(() => {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'ping' }))
+        const currentPingId = pingId++
+        pingTimestamps.set(currentPingId, Date.now())
+        ws.send(JSON.stringify({ type: 'ping', id: currentPingId }))
+
+        // Check if we haven't received a pong recently
+        const timeSinceLastPong = Date.now() - lastSuccessfulPong.value
+        if (timeSinceLastPong > HEARTBEAT_TIMEOUT_MS) {
+          missedPongs.value++
+
+          if (IS_DEV) {
+            logger.debug(`Missed pong (${missedPongs.value}/${MAX_MISSED_PONGS})`)
+          }
+
+          if (missedPongs.value >= MAX_MISSED_PONGS) {
+            logger.warn('Multiple missed pongs - connection unstable')
+            networkState.value = 'unstable'
+            // Force reconnection
+            ws.close()
+          } else {
+            networkState.value = 'unstable'
+          }
+        }
       }
     }, HEARTBEAT_INTERVAL_MS)
   }
@@ -251,6 +483,26 @@ export function usePokerRoom(roomId: string) {
       heartbeatInterval = null
     }
   }
+
+  // Connection quality computed properties
+  const averageLatency = computed(() => {
+    if (latencyMeasurements.value.length === 0) return null
+    return Math.round(
+      latencyMeasurements.value.reduce((a, b) => a + b, 0) / latencyMeasurements.value.length
+    )
+  })
+
+  const jitter = computed(() => {
+    if (latencyMeasurements.value.length < 2) return null
+    const avg = averageLatency.value
+    if (avg === null) return null
+
+    const variance = latencyMeasurements.value.reduce((sum, val) =>
+      sum + Math.pow(val - avg, 2), 0) / latencyMeasurements.value.length
+    return Math.round(Math.sqrt(variance))
+  })
+
+  const queuedMessageCount = computed(() => messageQueue.value.length)
 
   // Computed properties
   const myVote = computed(() => {
@@ -397,23 +649,24 @@ export function usePokerRoom(roomId: string) {
       return false
     }
 
+    const message = {
+      type: 'vote',
+      vote: voteValue
+    }
+
+    // If not connected, queue the message
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      toast.error('Not connected to room')
-      return false
+      return queueMessage(message, 'vote')
     }
 
     try {
       isLoading.value = true
-      ws.send(JSON.stringify({
-        type: 'vote',
-        vote: voteValue
-      }))
-
+      ws.send(JSON.stringify(message))
       return true
     } catch (error) {
       logger.error('Failed to vote:', error)
-      toast.error('Failed to submit vote')
-      return false
+      // Try to queue on send failure
+      return queueMessage(message, 'vote')
     } finally {
       isLoading.value = false
     }
@@ -481,22 +734,22 @@ export function usePokerRoom(roomId: string) {
       return false
     }
 
+    const message = {
+      type: 'setStory',
+      title: title.trim()
+    }
+
+    // If not connected, queue the message
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      toast.error('Not connected to room')
-      return false
+      return queueMessage(message, 'setStory')
     }
 
     try {
-      ws.send(JSON.stringify({
-        type: 'setStory',
-        title: title.trim()
-      }))
-
+      ws.send(JSON.stringify(message))
       return true
     } catch (error) {
       logger.error('Failed to set story:', error)
-      toast.error('Failed to set story title')
-      return false
+      return queueMessage(message, 'setStory')
     }
   }
 
@@ -506,24 +759,22 @@ export function usePokerRoom(roomId: string) {
       return false
     }
 
+    const message = {
+      type: 'setScale',
+      scale
+    }
+
+    // If not connected, queue the message
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      toast.error('Not connected to room')
-      return false
+      return queueMessage(message, 'setScale')
     }
 
     try {
-      ws.send(JSON.stringify({
-        type: 'setScale',
-        scale
-      }))
-
-      // Success feedback comes from UI update (cards change immediately)
-      // No optimistic toast to avoid misleading user if server rejects change
+      ws.send(JSON.stringify(message))
       return true
     } catch (error) {
       logger.error('Failed to set voting scale:', error)
-      toast.error('Failed to change voting scale')
-      return false
+      return queueMessage(message, 'setScale')
     }
   }
 
@@ -533,22 +784,22 @@ export function usePokerRoom(roomId: string) {
       return false
     }
 
+    const message = {
+      type: 'setAutoReveal',
+      autoReveal
+    }
+
+    // If not connected, queue the message
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      toast.error('Not connected to room')
-      return false
+      return queueMessage(message, 'setAutoReveal')
     }
 
     try {
-      ws.send(JSON.stringify({
-        type: 'setAutoReveal',
-        autoReveal
-      }))
-
+      ws.send(JSON.stringify(message))
       return true
     } catch (error) {
       logger.error('Failed to set auto-reveal:', error)
-      toast.error('Failed to change auto-reveal setting')
-      return false
+      return queueMessage(message, 'setAutoReveal')
     }
   }
 
@@ -581,6 +832,14 @@ export function usePokerRoom(roomId: string) {
     status,
     isLoading: readonly(isLoading),
     reconnectAttempts: reconnectAttemptsRef,
+
+    // Connection quality monitoring
+    connectionQuality: readonly(connectionQuality),
+    currentLatency: readonly(currentLatency),
+    averageLatency,
+    jitter,
+    networkState: readonly(networkState),
+    queuedMessageCount,
 
     // Computed
     myVote,

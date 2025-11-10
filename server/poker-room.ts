@@ -104,10 +104,12 @@ interface ResetMessage {
 
 interface PingMessage {
   type: "ping";
+  id?: number;  // Optional for backward compatibility
 }
 
 interface PongMessage {
   type: "pong";
+  id?: number;  // Optional for backward compatibility
 }
 
 interface SetStoryMessage {
@@ -250,7 +252,8 @@ export class PokerRoom extends DurableObject {
 
       // Handle ping/pong for heartbeat
       if (parsed.type === "ping") {
-        ws.send(JSON.stringify({ type: "pong" }));
+        // Echo back the ping ID for latency measurement (backward compatible)
+        ws.send(JSON.stringify({ type: "pong", id: parsed.id }));
         return;
       }
 

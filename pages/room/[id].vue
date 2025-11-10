@@ -17,6 +17,10 @@ const {
   status,
   isLoading,
   reconnectAttempts,
+  connectionQuality,
+  currentLatency,
+  jitter,
+  queuedMessageCount,
   connectToRoom,
   leaveRoom,
   joinRoom,
@@ -215,6 +219,15 @@ watch(status, (newStatus) => {
       :show="showNameModal && status === 'OPEN'"
       @join="handleJoinRoom"
       @close="showNameModal = false"
+    />
+
+    <!-- Connection Indicator -->
+    <ConnectionIndicator
+      :quality="connectionQuality"
+      :status="status"
+      :latency="currentLatency"
+      :jitter="jitter"
+      :queued-count="queuedMessageCount"
     />
 
     <!-- Toast Notifications -->
