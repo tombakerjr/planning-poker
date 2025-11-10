@@ -341,7 +341,7 @@ export function usePokerRoom(roomId: string) {
     try {
       ws = new WebSocket(wsUrl)
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         if (IS_DEV) {
           logger.debug('WebSocket connection opened')
         }
