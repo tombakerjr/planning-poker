@@ -1,7 +1,14 @@
 import { ref, computed, readonly, onUnmounted, type InjectionKey } from 'vue'
 import { nanoid } from 'nanoid'
 import { useToast } from './useToast'
-import { logger } from '~/server/utils/logger'
+
+// Simple client-side logger (avoids importing server-side code)
+const logger = {
+  debug: (...args: any[]) => console.debug('[PokerRoom]', ...args),
+  info: (...args: any[]) => console.info('[PokerRoom]', ...args),
+  warn: (...args: any[]) => console.warn('[PokerRoom]', ...args),
+  error: (...args: any[]) => console.error('[PokerRoom]', ...args),
+}
 
 export interface Participant {
   id: string
@@ -150,11 +157,12 @@ export function usePokerRoom(roomId: string) {
     // 5. Users see ConnectionIndicator and can manually re-trigger actions if needed
     //
     // This scenario is extremely rare (connection would have to close immediately after onopen,
-    // during the ~100ms flush window), and the impact is acceptable for this use case.
+    // during the flush window), and the impact is acceptable for this use case.
     for (const queued of validMessages) {
       try {
         ws.send(JSON.stringify(queued.message))
-        await new Promise(resolve => setTimeout(resolve, 100)) // 100ms delay between sends
+        // 150ms delay prevents server rate limiting (10 msg/sec)
+        await new Promise(resolve => setTimeout(resolve, 150))
       } catch (error) {
         logger.error('Failed to flush queued message:', error)
         // Continue to next message (don't re-queue failures - see comment above)
@@ -249,8 +257,8 @@ export function usePokerRoom(roomId: string) {
             currentLatency.value = rtt
             latencyMeasurements.value.push(rtt)
 
-            // Keep only last 3 measurements
-            if (latencyMeasurements.value.length > 3) {
+            // Keep only last 10 measurements for better jitter accuracy
+            if (latencyMeasurements.value.length > 10) {
               latencyMeasurements.value.shift()
             }
 
