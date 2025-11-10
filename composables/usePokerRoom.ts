@@ -50,6 +50,8 @@ const MAX_NAME_LENGTH = 50
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
 const MAX_QUEUE_SIZE = 10
 const MAX_MESSAGE_AGE_MS = 15000  // 15 seconds
+const LATENCY_MEASUREMENT_WINDOW = 10  // Keep last 10 samples for accurate jitter calculation
+const QUEUE_FLUSH_DELAY_MS = 150  // 150ms between sends = ~6.7 msg/sec (safe under 10 msg/sec limit)
 const IS_DEV = process.env.NODE_ENV === 'development'
 
 export function usePokerRoom(roomId: string) {
@@ -161,8 +163,8 @@ export function usePokerRoom(roomId: string) {
     for (const queued of validMessages) {
       try {
         ws.send(JSON.stringify(queued.message))
-        // 150ms delay prevents server rate limiting (10 msg/sec)
-        await new Promise(resolve => setTimeout(resolve, 150))
+        // Delay between sends to avoid server rate limiting
+        await new Promise(resolve => setTimeout(resolve, QUEUE_FLUSH_DELAY_MS))
       } catch (error) {
         logger.error('Failed to flush queued message:', error)
         // Continue to next message (don't re-queue failures - see comment above)
@@ -257,8 +259,8 @@ export function usePokerRoom(roomId: string) {
             currentLatency.value = rtt
             latencyMeasurements.value.push(rtt)
 
-            // Keep only last 10 measurements for better jitter accuracy
-            if (latencyMeasurements.value.length > 10) {
+            // Keep only last N measurements for better jitter accuracy
+            if (latencyMeasurements.value.length > LATENCY_MEASUREMENT_WINDOW) {
               latencyMeasurements.value.shift()
             }
 
