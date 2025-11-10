@@ -10,10 +10,15 @@ planning-poker/
 ├── vitest.config.ts            # Test configuration
 ├── playwright.config.ts        # E2E test configuration
 ├── tsconfig.json               # TypeScript configuration
+├── tailwind.config.ts          # Tailwind CSS configuration
 ├── package.json                # Dependencies and scripts
-├── CLAUDE.md                   # Claude Code guidance (this file)
+├── CLAUDE.md                   # Claude Code guidance
 ├── CONTEXT.md                  # Project context
-└── IMPLEMENTATION_PLAN.md      # Implementation phases
+├── IMPLEMENTATION_PLAN.md      # Implementation phases
+├── README.md                   # Project readme
+├── PERFORMANCE.md              # Performance notes
+├── UX_IMPROVEMENTS.md          # UX improvement tracking
+└── troubleshooting.md          # Troubleshooting guide
 ```
 
 ## Server Directory (`server/`)
@@ -22,15 +27,17 @@ server/
 ├── poker-room.ts               # Durable Object implementation (core logic)
 ├── poker-room.test.ts          # Durable Object unit tests
 ├── index.ts                    # Server entry point
-├── api/                        # API routes
-│   ├── room/
-│   │   ├── create.post.ts      # Room creation endpoint
-│   │   ├── create.post.test.ts # Room creation tests
-│   │   └── [id]/
-│   │       └── ws.get.ts       # WebSocket route (NOT USED - see worker.ts)
-├── utils/                      # Server utilities
-└── plugins/                    # Server plugins
+├── utils/
+│   └── logger.ts              # Logging utility
+├── plugins/
+│   └── durable-objects.ts     # Durable Objects plugin setup
+└── api/                        # API routes
+    └── room/
+        ├── create.post.ts      # Room creation endpoint
+        └── create.post.test.ts # Room creation tests
 ```
+
+**Important Note**: WebSocket routing is handled entirely by `worker.ts`, not by Nuxt API routes.
 
 ## Pages Directory (`pages/`)
 ```
@@ -47,14 +54,19 @@ components/
 ├── VotingArea.vue             # Voting cards (0, 1, 2, 3, 5, 8, 13, etc.)
 ├── ParticipantList.vue        # Shows all participants and their votes
 ├── UserNameModal.vue          # Name input modal for new users
-└── ToastContainer.vue         # Toast notifications
+├── ToastContainer.vue         # Toast notifications
+├── ThemeToggle.vue            # Dark/light mode toggle
+├── AutoRevealToggle.vue       # Auto-reveal votes toggle
+└── VotingScaleSelector.vue    # Voting scale selector
 ```
 
 ## Composables Directory (`composables/`)
 ```
 composables/
 ├── usePokerRoom.ts            # WebSocket connection, auto-reconnection, state management
-└── useToast.ts                # Toast notification management
+├── useToast.ts                # Toast notification management
+├── useColorMode.ts            # Theme/color mode management
+└── useVotingScale.ts          # Voting scale management
 ```
 
 ## Test Directories
@@ -77,3 +89,4 @@ coverage/                      # Test coverage reports
 - `composables/usePokerRoom.ts:150-164` - Reconnection logic
 - `server/poker-room.ts` - Durable Object message handling, state management
 - `server/api/room/create.post.ts` - Room creation endpoint
+- `server/utils/logger.ts` - Server-side logging utility

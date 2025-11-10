@@ -17,14 +17,24 @@
 - **Build Tool**: Nitro with cloudflare_module preset
 
 ## Key Dependencies
-- **@vueuse/core**: Vue composables utilities
-- **nanoid**: Unique ID generation for rooms
-- **h3**: HTTP framework (used by Nitro)
+- **@vueuse/core**: Vue composables utilities (v13.4.0+)
+- **nanoid**: Unique ID generation for rooms (v5.1.5+)
+- **h3**: HTTP framework (v1.15.3+) - used by Nitro
 - **wrangler**: Cloudflare Workers CLI (v4.22.0+)
+- **vue-router**: Vue routing (v4.5.1+)
+
+## Testing Dependencies
+- **@cloudflare/vitest-pool-workers**: Durable Object testing (v0.9.13+)
+- **@vitest/coverage-v8**: Code coverage (v3.2.4+)
+- **@vitest/ui**: Test UI (v3.2.4+)
+- **@vue/test-utils**: Vue component testing (v2.4.6+)
+- **happy-dom**: DOM simulation (v20.0.5+)
+- **@playwright/test**: E2E testing (v1.56.1+)
 
 ## Configuration Files
-- `wrangler.jsonc`: Defines Durable Object bindings, compatibility date, observability
+- `wrangler.jsonc`: Defines Durable Object bindings, compatibility date (2025-06-28), observability
 - `nuxt.config.ts`: Nitro preset (cloudflare_module), compatibility version 4
 - `vitest.config.ts`: Uses vitest-pool-workers for Durable Object testing
 - `playwright.config.ts`: E2E test configuration
 - `tsconfig.json`: Extends .nuxt/tsconfig.json with worker types
+- `tailwind.config.ts`: Tailwind CSS v4 configuration

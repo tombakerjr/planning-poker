@@ -8,6 +8,7 @@ When completing a task or implementing a feature, follow this checklist:
 - [ ] Use Tailwind CSS utilities for styling
 - [ ] Add proper input validation (server-side)
 - [ ] Handle errors appropriately
+- [ ] Update logger calls if adding new functionality
 
 ## 2. Testing
 - [ ] Write/update unit tests
@@ -30,7 +31,7 @@ When completing a task or implementing a feature, follow this checklist:
 - [ ] Update CLAUDE.md if architecture changed
 - [ ] Add code comments where necessary
 - [ ] Document new patterns or conventions
-- [ ] Update relevant .md files (CONTEXT.md, IMPLEMENTATION_PLAN.md, etc.)
+- [ ] Update relevant .md files (CONTEXT.md, IMPLEMENTATION_PLAN.md, README.md, etc.)
 
 ## 6. Git Workflow
 - [ ] Create feature branch from main: `git checkout -b phase{X}-{description}`
@@ -48,12 +49,22 @@ When completing a task or implementing a feature, follow this checklist:
 
 ## 8. Common Pitfalls to Avoid
 - [ ] Don't forget to clean up heartbeat intervals in `webSocketClose()`
-- [ ] Don't modify `server/api/room/[id]/ws.get.ts` (not used for WebSocket routing)
 - [ ] Ensure session persistence works (localStorage + ws.serializeAttachment)
 - [ ] Test reconnection logic with exponential backoff
 - [ ] Validate inputs server-side (names, messages, rate limiting)
+- [ ] Update WebSocketMessage type when adding new message types
+- [ ] Update RoomStorage interface when adding new state fields
+- [ ] Test auto-reveal behavior if modifying voting logic
+- [ ] Test theme switching if modifying UI components
 
-## 9. Monitoring After Deploy
+## 9. Feature-Specific Checks
+- [ ] **Voting scales**: Ensure new scales are added to VALID_SCALES and SCALE_VALUES
+- [ ] **Auto-reveal**: Test with various participant counts and voting patterns
+- [ ] **WebSocket messages**: Update both server (poker-room.ts) and client (usePokerRoom.ts)
+- [ ] **State changes**: Broadcast updates to all connected clients
+- [ ] **UI changes**: Test in both light and dark modes
+
+## 10. Monitoring After Deploy
 - [ ] Check Cloudflare Dashboard → Workers & Pages → planning-poker → Logs
 - [ ] Verify production deployment: https://planning-poker.tombaker.workers.dev
 - [ ] Test the feature in production

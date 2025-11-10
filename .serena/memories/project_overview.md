@@ -19,14 +19,32 @@ The app uses a custom worker entrypoint (`worker.ts`) that routes requests:
 - **Real-time**: WebSocket communication with heartbeat pings every 30 seconds
 - **Client-side**: Auto-reconnection with exponential backoff (max 10 attempts)
 
+### Room State Structure
+```typescript
+{
+  participants: Record<string, Participant>,
+  votesRevealed: boolean,
+  storyTitle: string,
+  votingScale?: string,      // fibonacci, modified-fibonacci, t-shirt, etc.
+  autoReveal?: boolean       // auto-reveal votes when everyone has voted
+}
+```
+
 ### Message Protocol
 All WebSocket messages follow:
 ```typescript
 {
-  type: 'join' | 'vote' | 'reveal' | 'reset' | 'update' | 'error' | 'ping' | 'pong',
+  type: 'auth' | 'join' | 'vote' | 'reveal' | 'reset' | 'ping' | 'pong' | 'setStory' | 'setScale' | 'setAutoReveal' | 'update' | 'error',
   payload?: any
 }
 ```
+
+### Key Features
+- **Multiple voting scales**: Fibonacci, Modified Fibonacci, T-Shirt sizes, Powers of 2
+- **Auto-reveal**: Automatically reveal votes when all participants have voted
+- **Story titles**: Set context for each voting round
+- **Dark/light mode**: Theme support with system preference detection
+- **Session persistence**: Maintains user state across page refreshes and hibernation
 
 ## Deployment
 - **Host**: Cloudflare Workers
