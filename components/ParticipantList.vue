@@ -63,13 +63,13 @@ function getParticipantColor(userId: string): string {
           </div>
           <span class="font-medium text-gray-800 dark:text-white transition-colors duration-200">{{ participant.name }}</span>
         </div>
-        <span class="w-8 text-center font-mono text-lg font-bold">
+        <span class="w-8 text-center text-lg">
           <template v-if="!roomState.votesRevealed">
-            <span v-if="participant.vote !== null" class="text-green-500 dark:text-green-400">✔</span>
-            <span v-else class="text-gray-400 dark:text-gray-500">...</span>
+            <span v-if="participant.vote !== null" class="text-green-500 dark:text-green-400" aria-label="Voted" role="img">✓</span>
+            <span v-else class="text-gray-400 dark:text-gray-500" aria-label="Not voted" role="img">⏳</span>
           </template>
           <template v-else>
-            <span class="text-blue-600 dark:text-blue-400 transition-colors duration-200">{{ participant.vote ?? '-' }}</span>
+            <span class="text-blue-600 dark:text-blue-400 font-mono font-bold transition-colors duration-200" :aria-label="`Vote: ${participant.vote ?? 'none'}`">{{ participant.vote ?? '-' }}</span>
           </template>
         </span>
       </li>

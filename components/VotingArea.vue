@@ -22,11 +22,33 @@ const supportsNumericStats = computed(() => {
 const selectedValue = ref<string | number | null>(null)
 const isEditingStory = ref(false)
 const storyInput = ref('')
+const voteChanged = ref(false)
+const hasVotedBefore = ref(false)
+const voteChangeTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
-// Watch for changes in our vote from the server
-watchEffect(() => {
-  if (myVote.value) {
-    selectedValue.value = myVote.value
+// Watch for changes in our vote from the server (sync selected value with server state)
+// Always sync, even when null (handles vote clearing)
+watch(myVote, (newVote) => {
+  selectedValue.value = newVote
+
+  // Clear any pending vote change indicator when server sends update
+  if (voteChangeTimeout.value) {
+    clearTimeout(voteChangeTimeout.value)
+    voteChangeTimeout.value = null
+    voteChanged.value = false
+  }
+})
+
+// Reset vote change tracking when round resets
+watch(() => roomState.value.votesRevealed, (newRevealed, oldRevealed) => {
+  // When transitioning from revealed to not revealed (round reset)
+  if (oldRevealed && !newRevealed) {
+    hasVotedBefore.value = false
+    voteChanged.value = false
+    if (voteChangeTimeout.value) {
+      clearTimeout(voteChangeTimeout.value)
+      voteChangeTimeout.value = null
+    }
   }
 })
 
@@ -37,11 +59,52 @@ function handleSelect(value: string | number) {
   }
 
   const newValue = selectedValue.value === value ? null : value
+
   selectedValue.value = newValue
+
+  // Handle unvote: clear vote change indicator but keep tracking state
+  // hasVotedBefore is only reset on round reset (see watch on votesRevealed)
+  if (newValue === null) {
+    // Clear vote change indicator if showing
+    voteChanged.value = false
+    if (voteChangeTimeout.value) {
+      clearTimeout(voteChangeTimeout.value)
+      voteChangeTimeout.value = null
+    }
+  } else if (hasVotedBefore.value) {
+    // Track vote changes (not the first vote)
+    voteChanged.value = true
+
+    // Clear existing timeout
+    if (voteChangeTimeout.value) {
+      clearTimeout(voteChangeTimeout.value)
+    }
+
+    // Hide the indicator after 3 seconds
+    voteChangeTimeout.value = setTimeout(() => {
+      voteChanged.value = false
+    }, 3000)
+  }
+
+  // Set flag after first vote
+  if (newValue !== null) {
+    hasVotedBefore.value = true
+  }
 
   // Send vote to server
   vote(newValue)
 }
+
+// Clean up timeout and state on unmount
+onBeforeUnmount(() => {
+  if (voteChangeTimeout.value) {
+    clearTimeout(voteChangeTimeout.value)
+    voteChangeTimeout.value = null
+  }
+  // Clear state to prevent stale data if component remounts
+  voteChanged.value = false
+  hasVotedBefore.value = false
+})
 
 function startEditingStory() {
   if (!isJoined.value) return
@@ -150,6 +213,19 @@ function handleStoryKeydown(event: KeyboardEvent) {
       <p class="min-h-[48px] text-4xl font-bold text-blue-600 dark:text-blue-400 transition-colors duration-200">
         {{ selectedValue ?? '...' }}
       </p>
+      <!-- Vote changed indicator -->
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <p v-if="voteChanged" class="mt-2 inline-block rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 text-sm font-medium text-yellow-800 dark:text-yellow-300 transition-colors duration-200">
+          Vote changed
+        </p>
+      </Transition>
     </div>
 
     <!-- Voting status -->

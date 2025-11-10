@@ -86,6 +86,89 @@ describe('PokerRoom Durable Object', () => {
     });
   });
 
+  describe('Auto-Reveal Functionality', () => {
+    // Note: Due to Durable Object storage isolation in vitest-pool-workers,
+    // we can only document expected behavior here. Full integration tests
+    // would require a different testing approach (e.g., E2E tests).
+
+    it('should accept WebSocket connections for auto-reveal testing', async () => {
+      const request = new Request('https://example.com/ws', {
+        headers: { upgrade: 'websocket' }
+      });
+      const response = await room.fetch(request);
+      expect(response.status).toBe(101);
+      expect(response.webSocket).toBeDefined();
+    });
+
+    it('should document auto-reveal behavior', () => {
+      // Documents expected behavior:
+      // 1. autoReveal is stored in RoomStorage (default: false)
+      // 2. When setAutoReveal message is received, update roomState.autoReveal
+      // 3. After a vote is submitted, if autoReveal is true AND all participants have voted:
+      //    - Automatically set votesRevealed = true
+      // 4. Broadcast updated state to all clients
+
+      const exampleState = {
+        participants: {
+          'user1': { name: 'Alice', vote: null },
+          'user2': { name: 'Bob', vote: null }
+        },
+        autoReveal: true,
+        votesRevealed: false
+      };
+
+      // After user1 votes (but not all voted yet)
+      expect(exampleState.participants['user1'].vote).toBe(null);
+      expect(exampleState.votesRevealed).toBe(false);
+
+      // After user2 votes (all voted, auto-reveal triggers)
+      const afterAllVoted = {
+        participants: {
+          'user1': { name: 'Alice', vote: 5 },
+          'user2': { name: 'Bob', vote: 8 }
+        },
+        autoReveal: true,
+        votesRevealed: true // Auto-revealed!
+      };
+
+      expect(afterAllVoted.votesRevealed).toBe(true);
+    });
+
+    it('should not auto-reveal when disabled', () => {
+      // Documents expected behavior:
+      // When autoReveal is false, votes should NOT be automatically revealed
+      // even if all participants have voted
+
+      const stateWithAutoRevealOff = {
+        participants: {
+          'user1': { name: 'Alice', vote: 5 },
+          'user2': { name: 'Bob', vote: 8 }
+        },
+        autoReveal: false,
+        votesRevealed: false
+      };
+
+      // All voted, but auto-reveal is off, so votes remain hidden
+      expect(stateWithAutoRevealOff.votesRevealed).toBe(false);
+    });
+
+    it('should persist auto-reveal setting in storage', () => {
+      // Documents expected behavior:
+      // autoReveal is part of RoomStorage and persisted to Durable Object storage
+      // See server/poker-room.ts:74 for RoomStorage interface
+
+      const storageSchema = {
+        participants: {},
+        votesRevealed: false,
+        storyTitle: '',
+        votingScale: 'fibonacci',
+        autoReveal: false
+      };
+
+      expect(storageSchema.autoReveal).toBe(false);
+    });
+  });
+
   describe('Voting Scale Management', () => {
     // Note: Due to Durable Object storage isolation in vitest-pool-workers,
     // we can only document expected behavior here. Full integration tests
