@@ -60,7 +60,7 @@ Measure connection quality based on latency and jitter (variance) to provide acc
 
 **New state in `usePokerRoom.ts`:**
 ```typescript
-const latencyMeasurements = ref<number[]>([])  // Rolling window of last 3 RTT
+const latencyMeasurements = ref<number[]>([])  // Rolling window of last 10 RTT (better jitter accuracy)
 const currentLatency = ref<number | null>(null)
 const connectionQuality = ref<'good' | 'fair' | 'poor' | 'disconnected'>('disconnected')
 ```
@@ -185,7 +185,7 @@ async function flushMessageQueue() {
   for (const queued of validMessages) {
     try {
       ws.send(JSON.stringify(queued.message))
-      await new Promise(resolve => setTimeout(resolve, 100)) // 100ms delay between sends
+      await new Promise(resolve => setTimeout(resolve, 150)) // 150ms delay between sends (safety margin)
     } catch (error) {
       logger.error('Failed to flush queued message:', error)
     }
@@ -312,7 +312,7 @@ case 'pong':
     const rtt = Date.now() - pingTimestamp
     currentLatency.value = rtt
     latencyMeasurements.value.push(rtt)
-    if (latencyMeasurements.value.length > 3) {
+    if (latencyMeasurements.value.length > 10) {
       latencyMeasurements.value.shift()
     }
     pingTimestamps.delete(message.id)
@@ -655,7 +655,7 @@ return {
 
 **Network:**
 - Ping/pong overhead: ~100 bytes every 25s (negligible)
-- Queue flush: 100ms delay between messages (prevent rate limiting)
+- Queue flush: 150ms delay between messages (~6.7 msg/sec, safe margin under 10 msg/sec limit)
 
 ### Backward Compatibility
 

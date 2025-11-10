@@ -2,7 +2,12 @@ import { ref, computed, readonly, onUnmounted, type InjectionKey } from 'vue'
 import { nanoid } from 'nanoid'
 import { useToast } from './useToast'
 
-// Simple client-side logger (avoids importing server-side code)
+// Client-side logger implementation
+// Note: Cannot import ~/server/utils/logger here because:
+// 1. Composables run in browser context (client-side)
+// 2. Server utilities may have Node.js dependencies unavailable in browser
+// 3. Importing server code into client bundle increases bundle size unnecessarily
+// 4. Proper separation of concerns: client logging vs server logging have different needs
 const logger = {
   debug: (...args: any[]) => console.debug('[PokerRoom]', ...args),
   info: (...args: any[]) => console.info('[PokerRoom]', ...args),
