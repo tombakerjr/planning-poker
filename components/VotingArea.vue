@@ -62,9 +62,15 @@ function handleSelect(value: string | number) {
 
   selectedValue.value = newValue
 
-  // Handle unvote: reset tracking state
+  // Handle unvote: clear vote change indicator but keep tracking state
+  // hasVotedBefore is only reset on round reset (see watch on votesRevealed)
   if (newValue === null) {
-    hasVotedBefore.value = false
+    // Clear vote change indicator if showing
+    voteChanged.value = false
+    if (voteChangeTimeout.value) {
+      clearTimeout(voteChangeTimeout.value)
+      voteChangeTimeout.value = null
+    }
   } else if (hasVotedBefore.value) {
     // Track vote changes (not the first vote)
     voteChanged.value = true
