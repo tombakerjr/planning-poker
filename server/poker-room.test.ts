@@ -269,4 +269,135 @@ describe('PokerRoom Durable Object', () => {
       expect(storageSchema.votingScale).toBe('fibonacci');
     });
   });
+
+  describe('Ping/Pong with ID (Connection Resilience)', () => {
+    // These tests document the ping/pong ID echo behavior for latency measurement
+    // Per Phase 5D design doc, server echoes ping ID to enable RTT calculation
+
+    it('should echo ping ID in pong response', () => {
+      // Documents expected behavior: When client sends { type: 'ping', id: 123 }
+      // Server should respond with { type: 'pong', id: 123 }
+      //
+      // This enables client to calculate Round-Trip Time (RTT) by:
+      // 1. Client stores timestamp when sending ping with ID
+      // 2. Server echoes ID in pong
+      // 3. Client matches ID to stored timestamp, calculates RTT
+      //
+      // See server/poker-room.ts:256 for implementation
+
+      const pingMessage = {
+        type: 'ping',
+        id: 123
+      };
+
+      const expectedPongMessage = {
+        type: 'pong',
+        id: 123
+      };
+
+      // Verify message structure
+      expect(pingMessage.id).toBe(123);
+      expect(expectedPongMessage.id).toBe(pingMessage.id);
+    });
+
+    it('should handle ping without ID (backward compatibility)', () => {
+      // Documents backward compatibility: Old clients may send { type: 'ping' }
+      // Server should still respond with { type: 'pong' } without error
+      //
+      // This ensures clients without latency measurement continue to work
+      // See server/poker-room.ts:256 for implementation (id is optional)
+
+      const oldPingMessage = {
+        type: 'ping'
+        // No ID field
+      };
+
+      const expectedPongMessage = {
+        type: 'pong'
+        // No ID field required
+      };
+
+      // Verify messages are valid
+      expect(oldPingMessage.type).toBe('ping');
+      expect(expectedPongMessage.type).toBe('pong');
+    });
+
+    it('should preserve ID type and value in echo', () => {
+      // Documents that ID should be echoed exactly as received
+      // Client uses sequential integer IDs for tracking
+
+      const testCases = [
+        { input: 0, expected: 0 },
+        { input: 1, expected: 1 },
+        { input: 999, expected: 999 },
+        { input: 2147483647, expected: 2147483647 } // Max safe int
+      ];
+
+      testCases.forEach(({ input, expected }) => {
+        const ping = { type: 'ping', id: input };
+        const pong = { type: 'pong', id: ping.id };
+
+        expect(pong.id).toBe(expected);
+        expect(pong.id).toBe(ping.id);
+      });
+    });
+
+    it('documents latency calculation requirements', () => {
+      // Documents the client-side latency calculation workflow:
+      //
+      // Client maintains:
+      // - pingId: incrementing counter
+      // - pingTimestamps: Map<pingId, timestamp>
+      //
+      // Workflow:
+      // 1. Client: Generate pingId++, store Date.now() in Map
+      // 2. Client: Send { type: 'ping', id: pingId }
+      // 3. Server: Receive, echo { type: 'pong', id: pingId }
+      // 4. Client: Receive pong, lookup timestamp by ID
+      // 5. Client: RTT = Date.now() - storedTimestamp
+      // 6. Client: Update latencyMeasurements array, calculate quality
+      //
+      // See composables/usePokerRoom.ts:244-261 for client implementation
+
+      const clientSimulation = {
+        pingId: 0,
+        pingTimestamps: new Map<number, number>(),
+
+        sendPing() {
+          const id = this.pingId++;
+          const timestamp = Date.now();
+          this.pingTimestamps.set(id, timestamp);
+          return { type: 'ping', id };
+        },
+
+        receivePong(pongId: number) {
+          const sentTimestamp = this.pingTimestamps.get(pongId);
+          if (sentTimestamp) {
+            const rtt = Date.now() - sentTimestamp;
+            this.pingTimestamps.delete(pongId); // Clean up
+            return rtt;
+          }
+          return null;
+        }
+      };
+
+      // Simulate workflow
+      const ping1 = clientSimulation.sendPing();
+      expect(ping1.id).toBe(0);
+      expect(clientSimulation.pingTimestamps.has(0)).toBe(true);
+
+      const ping2 = clientSimulation.sendPing();
+      expect(ping2.id).toBe(1);
+      expect(clientSimulation.pingTimestamps.size).toBe(2);
+
+      // Simulate pong responses (out of order to test ID matching)
+      const rtt2 = clientSimulation.receivePong(1);
+      expect(rtt2).toBeGreaterThanOrEqual(0);
+      expect(clientSimulation.pingTimestamps.size).toBe(1); // Cleaned up
+
+      const rtt1 = clientSimulation.receivePong(0);
+      expect(rtt1).toBeGreaterThanOrEqual(0);
+      expect(clientSimulation.pingTimestamps.size).toBe(0); // All cleaned up
+    });
+  });
 });

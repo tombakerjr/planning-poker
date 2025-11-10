@@ -185,7 +185,8 @@ export function usePokerRoom(roomId: string) {
     const jitter = exponentialDelay * JITTER_FACTOR * (Math.random() - 0.5) * 2
     const delayWithJitter = exponentialDelay + jitter
 
-    return Math.max(BASE_DELAY_MS, delayWithJitter)  // Never less than 1s
+    // Ensure delay is between min and max bounds
+    return Math.max(BASE_DELAY_MS, Math.min(MAX_RECONNECT_DELAY_MS, delayWithJitter))
   }
 
   // Try to restore user session from localStorage
