@@ -102,6 +102,6 @@ const showLatency = computed(() =>
 const latencyText = computed(() => {
   if (!props.latency) return ''
   const jitterText = props.jitter ? ` ±${props.jitter}ms` : ''
-  return `${props.latency}ms${jitterText}`
+  return `${Math.round(props.latency)}ms${jitterText}`
 })
 </script>

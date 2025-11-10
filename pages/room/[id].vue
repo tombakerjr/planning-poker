@@ -152,7 +152,7 @@ watch(status, (newStatus) => {
                     : status === 'CONNECTING'
                     ? 'Connecting...'
                     : status === 'RECONNECTING'
-                    ? `Reconnecting (${reconnectAttempts}/10)...`
+                    ? `Reconnecting (${reconnectAttempts}/15)...`
                     : 'Disconnected'
                 }}
               </span>

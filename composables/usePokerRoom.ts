@@ -138,16 +138,31 @@ export function usePokerRoom(roomId: string) {
     const expiredCount = messageQueue.value.length - validMessages.length
 
     // Send each queued message
+    // NOTE: Error handling here is intentional per design doc (2025-01-10-connection-resilience-design.md:627-631)
+    // If ws.send() fails, we skip the message and continue flushing remaining messages.
+    // This is NOT a race condition - it's deterministic error handling.
+    //
+    // Rationale for not re-queuing failed messages:
+    // 1. If send fails, connection is likely closing/closed (even though we just checked OPEN state)
+    // 2. Connection close will trigger onclose handler -> reconnection -> another flush attempt
+    // 3. By then, failed messages would likely exceed MAX_MESSAGE_AGE_MS (15s) and be stale anyway
+    // 4. For real-time planning poker, fail-fast is better than complex retry logic
+    // 5. Users see ConnectionIndicator and can manually re-trigger actions if needed
+    //
+    // This scenario is extremely rare (connection would have to close immediately after onopen,
+    // during the ~100ms flush window), and the impact is acceptable for this use case.
     for (const queued of validMessages) {
       try {
         ws.send(JSON.stringify(queued.message))
         await new Promise(resolve => setTimeout(resolve, 100)) // 100ms delay between sends
       } catch (error) {
         logger.error('Failed to flush queued message:', error)
+        // Continue to next message (don't re-queue failures - see comment above)
       }
     }
 
-    // Clear queue after flush
+    // Clear queue after flush (intentionally clears ALL messages, even if some failed to send)
+    // See rationale above - we don't retry failed messages in this design
     messageQueue.value = []
 
     // User feedback
@@ -279,8 +294,8 @@ export function usePokerRoom(roomId: string) {
         }
         networkState.value = 'online'
 
-        // Trigger reconnection if we're not connected
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
+        // Trigger reconnection if we're not connected (and not already connecting)
+        if (!ws || (ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CONNECTING)) {
           toast.info('Network restored. Reconnecting...')
           connectToRoom()
         }
@@ -346,10 +361,8 @@ export function usePokerRoom(roomId: string) {
           logger.debug('WebSocket connection opened')
         }
 
-        // Show reconnection success toast if this was a reconnect
-        if (reconnectAttempts > 0) {
-          toast.success('Reconnected successfully!')
-        }
+        const wasReconnecting = reconnectAttempts > 0
+        const hasQueuedMessages = messageQueue.value.length > 0
 
         status.value = 'OPEN'
         reconnectAttempts = 0 // Reset reconnection counter on successful connection
@@ -367,6 +380,12 @@ export function usePokerRoom(roomId: string) {
 
         // Flush any queued messages
         await flushMessageQueue()
+
+        // Only show generic reconnect toast if queue was empty
+        // (flushMessageQueue shows more informative toast if messages were sent)
+        if (wasReconnecting && !hasQueuedMessages) {
+          toast.success('Reconnected successfully!')
+        }
       }
 
       ws.onmessage = (event) => {
@@ -443,6 +462,12 @@ export function usePokerRoom(roomId: string) {
       reconnectTimeout = null
     }
     stopHeartbeat()
+
+    // Clear connection monitoring state to prevent memory leaks
+    pingTimestamps.clear()
+    latencyMeasurements.value = []
+    currentLatency.value = null
+
     status.value = 'CLOSED'
   }
 
