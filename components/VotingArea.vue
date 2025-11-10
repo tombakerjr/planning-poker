@@ -30,6 +30,13 @@ const voteChangeTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 // Always sync, even when null (handles vote clearing)
 watch(myVote, (newVote) => {
   selectedValue.value = newVote
+
+  // Clear any pending vote change indicator when server sends update
+  if (voteChangeTimeout.value) {
+    clearTimeout(voteChangeTimeout.value)
+    voteChangeTimeout.value = null
+    voteChanged.value = false
+  }
 })
 
 // Reset vote change tracking when round resets

@@ -601,22 +601,28 @@ export class PokerRoom extends DurableObject {
 
   /**
    * Atomically reveal votes if conditions are met.
-   * Minimizes race condition window by doing read-check-write in tight sequence.
-   * Note: There's still a small race window between read and write where concurrent
-   * changes could be lost. This is a limitation of the current architecture.
+   * Uses Durable Object transaction to prevent race conditions where concurrent
+   * state changes (e.g., story title updates) could be lost.
    */
   private async tryAutoReveal(): Promise<void> {
-    // Read current state
-    const state = await this.getRoomState();
+    // Use transaction to atomically read-check-write
+    await this.ctx.storage.transaction(async (txn) => {
+      // Read current state within transaction
+      const state = await txn.get<RoomStorage>("state");
 
-    // Check conditions - if they don't hold, do nothing
-    if (!state.autoReveal || state.votesRevealed || !this.checkAllVoted(state)) {
-      return;
-    }
+      if (!state) return;
 
-    // Modify and write back immediately to minimize race window
-    state.votesRevealed = true;
-    await this.setRoomState(state);
+      // Check conditions - if they don't hold, do nothing
+      if (!state.autoReveal || state.votesRevealed || !this.checkAllVoted(state)) {
+        return;
+      }
+
+      // Modify and write back atomically within transaction
+      state.votesRevealed = true;
+      await txn.put("state", state);
+    });
+
+    // Broadcast after transaction completes
     this.scheduleBroadcast();
   }
 
