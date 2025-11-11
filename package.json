@@ -19,8 +19,6 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
-    "@growthbook/edge-cloudflare": "^0.2.6",
-    "@growthbook/growthbook": "^1.6.2",
     "@vueuse/core": "^13.4.0",
     "nanoid": "^5.1.5",
     "nuxt": "^3.17.5",

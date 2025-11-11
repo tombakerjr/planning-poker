@@ -54,9 +54,21 @@ export function useFeatureFlags() {
         const cachedTimestamp = localStorage.getItem('feature-flags-timestamp')
 
         if (cached && !flags.value) {
-          flags.value = JSON.parse(cached)
-          lastUpdate.value = cachedTimestamp ? parseInt(cachedTimestamp, 10) : 0
-          console.info('Using cached flags from localStorage')
+          try {
+            const parsed = JSON.parse(cached)
+            // Validate it's an object with expected structure
+            if (parsed && typeof parsed === 'object' && 'APP_ENABLED' in parsed) {
+              flags.value = parsed
+              lastUpdate.value = cachedTimestamp ? parseInt(cachedTimestamp, 10) : 0
+              console.info('Using cached flags from localStorage')
+            } else {
+              console.warn('Invalid cached flags structure, ignoring')
+              localStorage.removeItem('feature-flags')
+            }
+          } catch (parseError) {
+            console.error('Failed to parse cached flags:', parseError)
+            localStorage.removeItem('feature-flags')
+          }
         }
       }
     } finally {
