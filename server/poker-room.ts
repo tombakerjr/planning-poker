@@ -163,13 +163,20 @@ export class PokerRoom extends DurableObject {
   private RATE_LIMIT_WINDOW_MS = DEFAULT_RATE_LIMIT_WINDOW_MS;
   private MAX_CONNECTIONS_PER_DO = DEFAULT_MAX_CONNECTIONS_PER_DO;
   private AUTO_REVEAL_DELAY_MS = DEFAULT_AUTO_REVEAL_DELAY_MS;
-  private configLoaded = false;
+  private configLoadedAt = 0;
+  private CONFIG_TTL = 300000; // 5 minutes
 
   /**
    * Load configuration from feature flags
+   * Includes retry mechanism with TTL to handle temporary KV outages
    */
   private async loadConfig(): Promise<void> {
-    if (this.configLoaded) return;
+    const now = Date.now();
+
+    // Check if config is still fresh (within TTL)
+    if (this.configLoadedAt && now - this.configLoadedAt < this.CONFIG_TTL) {
+      return;
+    }
 
     try {
       const config = createConfig(this.env as any);
@@ -187,7 +194,7 @@ export class PokerRoom extends DurableObject {
       CURRENT_LOG_LEVEL = LogLevel[logLevel as keyof typeof LogLevel] ?? LogLevel.WARN;
 
       config.destroy();
-      this.configLoaded = true;
+      this.configLoadedAt = now;
 
       logger.info('Config loaded from feature flags', {
         MAX_MESSAGE_SIZE: this.MAX_MESSAGE_SIZE,
@@ -196,7 +203,8 @@ export class PokerRoom extends DurableObject {
       });
     } catch (error) {
       logger.error('Failed to load config, using defaults', error);
-      this.configLoaded = true; // Don't retry on every request
+      // Set configLoadedAt anyway to prevent retry spam, but allow retry after TTL
+      this.configLoadedAt = now;
     }
   }
 
@@ -215,7 +223,7 @@ export class PokerRoom extends DurableObject {
   private async handleWebSocketUpgrade(_request: Request): Promise<Response> {
     // Check connection limit
     const currentConnections = this.ctx.getWebSockets().length;
-    if (currentConnections >= MAX_CONNECTIONS_PER_DO) {
+    if (currentConnections >= this.MAX_CONNECTIONS_PER_DO) {
       return new Response("Too many connections", { status: 429 });
     }
 
@@ -266,7 +274,7 @@ export class PokerRoom extends DurableObject {
       return;
     }
 
-    if (message.length > MAX_MESSAGE_SIZE) {
+    if (message.length > this.MAX_MESSAGE_SIZE) {
       logger.warn(`Message too large: ${message.length} bytes`);
       ws.close(1009, "Message too large");
       return;
@@ -419,7 +427,7 @@ export class PokerRoom extends DurableObject {
               logger.error("Auto-reveal failed:", err);
             });
             this.autoRevealTimeout = undefined;
-          }, AUTO_REVEAL_DELAY_MS) as unknown as number;
+          }, this.AUTO_REVEAL_DELAY_MS) as unknown as number;
         }
 
         // Early return since we've already persisted and broadcasted
@@ -689,7 +697,7 @@ export class PokerRoom extends DurableObject {
         logger.error("Failed to send ping:", error);
         this.stopHeartbeat(ws);
       }
-    }, HEARTBEAT_INTERVAL_MS) as unknown as number;
+    }, this.HEARTBEAT_INTERVAL_MS) as unknown as number;
 
     this.heartbeatIntervals.set(ws, intervalId);
   }
@@ -716,7 +724,7 @@ export class PokerRoom extends DurableObject {
     }
 
     // Check if we're in a new window
-    if (now - rateLimit.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    if (now - rateLimit.windowStart >= this.RATE_LIMIT_WINDOW_MS) {
       // Reset to new window
       rateLimit.messageCount = 1;
       rateLimit.windowStart = now;
@@ -727,7 +735,7 @@ export class PokerRoom extends DurableObject {
     rateLimit.messageCount++;
 
     // Check if limit exceeded
-    if (rateLimit.messageCount > MAX_MESSAGES_PER_SECOND) {
+    if (rateLimit.messageCount > this.MAX_MESSAGES_PER_SECOND) {
       return false;
     }
 

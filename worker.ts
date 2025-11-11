@@ -9,15 +9,29 @@ interface Env {
   FLAGS_CACHE: KVNamespace
 }
 
+// Module-level cache for kill switch to avoid KV reads on every request
+let killSwitchCache: { enabled: boolean; expiry: number } | null = null
+const KILL_SWITCH_CACHE_TTL = 60000 // 60 seconds
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // MASTER KILL SWITCH: Check APP_ENABLED flag before routing
     // Returns maintenance page when APP_ENABLED is false
-    const config = createConfig(env)
-    const appEnabled = await config.get('APP_ENABLED')
-    config.destroy()
+    const now = Date.now()
 
-    if (!appEnabled) {
+    // Check cache first to avoid KV reads on every request
+    if (!killSwitchCache || now > killSwitchCache.expiry) {
+      const config = createConfig(env)
+      const appEnabled = await config.get('APP_ENABLED')
+      config.destroy()
+
+      killSwitchCache = {
+        enabled: appEnabled,
+        expiry: now + KILL_SWITCH_CACHE_TTL
+      }
+    }
+
+    if (!killSwitchCache.enabled) {
       return new Response(
         `<!DOCTYPE html>
 <html lang="en">
