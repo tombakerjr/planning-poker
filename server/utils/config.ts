@@ -1,5 +1,3 @@
-import { GrowthBook } from '@growthbook/growthbook'
-
 // Flag value types
 export interface FlagDefaults {
   APP_ENABLED: boolean
@@ -46,36 +44,31 @@ interface CachedFlags {
  */
 export class Config {
   private flags: Partial<FlagDefaults> | null = null
-  private growthbook: GrowthBook | null = null
 
   constructor(
     private env: Env & { GROWTHBOOK_SDK_KEY?: string },
   ) {}
 
   /**
-   * Initialize GrowthBook and load flags
+   * Fetch features directly from GrowthBook CDN
    */
-  private async initGrowthBook(): Promise<void> {
-    if (this.growthbook) return
-
+  private async fetchFeaturesFromCDN(): Promise<Record<string, any>> {
     const sdkKey = this.env.GROWTHBOOK_SDK_KEY
     if (!sdkKey) {
       console.warn('GROWTHBOOK_SDK_KEY not found, using defaults')
-      return
+      return {}
     }
 
     try {
-      this.growthbook = new GrowthBook({
-        apiHost: 'https://cdn.growthbook.io',
-        clientKey: sdkKey,
-        enableDevMode: false,
-      })
-
-      // Load features from GrowthBook CDN
-      await this.growthbook.loadFeatures({ timeout: 3000 })
+      const response = await fetch(`https://cdn.growthbook.io/api/features/${sdkKey}`)
+      if (!response.ok) {
+        throw new Error(`GrowthBook CDN returned ${response.status}`)
+      }
+      const data = await response.json() as { features: Record<string, any> }
+      return data.features || {}
     } catch (error) {
-      console.error('Failed to initialize GrowthBook:', error)
-      this.growthbook = null
+      console.error('Failed to fetch from GrowthBook CDN:', error)
+      return {}
     }
   }
 
@@ -91,29 +84,26 @@ export class Config {
       return cached.flags
     }
 
-    // Initialize GrowthBook if needed
-    await this.initGrowthBook()
+    // Fetch fresh flags from GrowthBook CDN
+    try {
+      const features = await this.fetchFeaturesFromCDN()
 
-    // Fetch fresh flags from GrowthBook
-    if (this.growthbook) {
-      try {
-        const flags: Partial<FlagDefaults> = {
-          APP_ENABLED: this.growthbook.getFeatureValue('APP_ENABLED', DEFAULTS.APP_ENABLED),
-          HEARTBEAT_INTERVAL_MS: this.growthbook.getFeatureValue('HEARTBEAT_INTERVAL_MS', DEFAULTS.HEARTBEAT_INTERVAL_MS),
-          AUTO_REVEAL_DELAY_MS: this.growthbook.getFeatureValue('AUTO_REVEAL_DELAY_MS', DEFAULTS.AUTO_REVEAL_DELAY_MS),
-          MAX_MESSAGE_SIZE: this.growthbook.getFeatureValue('MAX_MESSAGE_SIZE', DEFAULTS.MAX_MESSAGE_SIZE),
-          MAX_CONNECTIONS_PER_DO: this.growthbook.getFeatureValue('MAX_CONNECTIONS_PER_DO', DEFAULTS.MAX_CONNECTIONS_PER_DO),
-          MAX_MESSAGES_PER_SECOND: this.growthbook.getFeatureValue('MAX_MESSAGES_PER_SECOND', DEFAULTS.MAX_MESSAGES_PER_SECOND),
-          RATE_LIMIT_WINDOW_MS: this.growthbook.getFeatureValue('RATE_LIMIT_WINDOW_MS', DEFAULTS.RATE_LIMIT_WINDOW_MS),
-          LOG_LEVEL: this.growthbook.getFeatureValue('LOG_LEVEL', DEFAULTS.LOG_LEVEL),
-        }
-
-        // Update cache
-        await this.setCachedFlags(flags)
-        return flags
-      } catch (error) {
-        console.error('Failed to fetch flags from GrowthBook:', error)
+      const flags: Partial<FlagDefaults> = {
+        APP_ENABLED: features.APP_ENABLED?.defaultValue ?? DEFAULTS.APP_ENABLED,
+        HEARTBEAT_INTERVAL_MS: features.HEARTBEAT_INTERVAL_MS?.defaultValue ?? DEFAULTS.HEARTBEAT_INTERVAL_MS,
+        AUTO_REVEAL_DELAY_MS: features.AUTO_REVEAL_DELAY_MS?.defaultValue ?? DEFAULTS.AUTO_REVEAL_DELAY_MS,
+        MAX_MESSAGE_SIZE: features.MAX_MESSAGE_SIZE?.defaultValue ?? DEFAULTS.MAX_MESSAGE_SIZE,
+        MAX_CONNECTIONS_PER_DO: features.MAX_CONNECTIONS_PER_DO?.defaultValue ?? DEFAULTS.MAX_CONNECTIONS_PER_DO,
+        MAX_MESSAGES_PER_SECOND: features.MAX_MESSAGES_PER_SECOND?.defaultValue ?? DEFAULTS.MAX_MESSAGES_PER_SECOND,
+        RATE_LIMIT_WINDOW_MS: features.RATE_LIMIT_WINDOW_MS?.defaultValue ?? DEFAULTS.RATE_LIMIT_WINDOW_MS,
+        LOG_LEVEL: features.LOG_LEVEL?.defaultValue ?? DEFAULTS.LOG_LEVEL,
       }
+
+      // Update cache
+      await this.setCachedFlags(flags)
+      return flags
+    } catch (error) {
+      console.error('Failed to fetch flags from GrowthBook:', error)
     }
 
     // Fall back to stale cache or defaults
@@ -186,13 +176,10 @@ export class Config {
   }
 
   /**
-   * Clean up GrowthBook instance
+   * Clean up (no-op now that we're fetching directly from CDN)
    */
   destroy(): void {
-    if (this.growthbook) {
-      this.growthbook.destroy()
-      this.growthbook = null
-    }
+    // No cleanup needed
   }
 }
 
