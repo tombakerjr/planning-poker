@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { createConfig } from './utils/config'
 
 // Simple logging utility for Durable Objects
 enum LogLevel {
@@ -8,10 +9,11 @@ enum LogLevel {
   ERROR = 3,
 }
 
-const LOG_LEVEL = LogLevel.WARN; // Only log warnings and errors in production
+// Global log level - will be set from config
+let CURRENT_LOG_LEVEL = LogLevel.WARN;
 
 function log(level: LogLevel, message: string, ...args: any[]) {
-  if (level < LOG_LEVEL) return;
+  if (level < CURRENT_LOG_LEVEL) return;
 
   const timestamp = new Date().toISOString();
   const levelName = LogLevel[level];
@@ -40,19 +42,18 @@ const logger = {
   error: (msg: string, ...args: any[]) => log(LogLevel.ERROR, msg, ...args),
 };
 
-const MAX_MESSAGE_SIZE = 1024 * 10; // 10KB
+// Non-configurable constants
 const MAX_NAME_LENGTH = 50;
-const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 
-// Rate limiting constants
-const MAX_MESSAGES_PER_SECOND = 10;
-const RATE_LIMIT_WINDOW_MS = 1000; // 1 second
-const MAX_CONNECTIONS_PER_DO = 100;
-
+// Default values for configurable constants (loaded from GrowthBook feature flags)
+const DEFAULT_MAX_MESSAGE_SIZE = 1024 * 10; // 10KB
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
+const DEFAULT_MAX_MESSAGES_PER_SECOND = 10;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 1000; // 1 second
+const DEFAULT_MAX_CONNECTIONS_PER_DO = 100;
 // Auto-reveal delay prevents race where last voter doesn't see their vote update
 // before reveal. 150ms balances UX (fast reveal) with reliability (WebSocket latency + React render).
-// Without delay, the last voter's UI may not update before votes are revealed.
-const AUTO_REVEAL_DELAY_MS = 150;
+const DEFAULT_AUTO_REVEAL_DELAY_MS = 150;
 
 // Voting scale definitions (must match client-side definitions)
 const VALID_SCALES = ['fibonacci', 'modified-fibonacci', 't-shirt', 'powers-of-2', 'linear'] as const;
@@ -155,7 +156,54 @@ export class PokerRoom extends DurableObject {
   private broadcastDebounceTimeout?: number;
   private autoRevealTimeout?: number;
 
+  // Configurable values loaded from feature flags
+  private MAX_MESSAGE_SIZE = DEFAULT_MAX_MESSAGE_SIZE;
+  private HEARTBEAT_INTERVAL_MS = DEFAULT_HEARTBEAT_INTERVAL_MS;
+  private MAX_MESSAGES_PER_SECOND = DEFAULT_MAX_MESSAGES_PER_SECOND;
+  private RATE_LIMIT_WINDOW_MS = DEFAULT_RATE_LIMIT_WINDOW_MS;
+  private MAX_CONNECTIONS_PER_DO = DEFAULT_MAX_CONNECTIONS_PER_DO;
+  private AUTO_REVEAL_DELAY_MS = DEFAULT_AUTO_REVEAL_DELAY_MS;
+  private configLoaded = false;
+
+  /**
+   * Load configuration from feature flags
+   */
+  private async loadConfig(): Promise<void> {
+    if (this.configLoaded) return;
+
+    try {
+      const config = createConfig(this.env as any);
+
+      // Load all config values
+      this.MAX_MESSAGE_SIZE = await config.get('MAX_MESSAGE_SIZE');
+      this.HEARTBEAT_INTERVAL_MS = await config.get('HEARTBEAT_INTERVAL_MS');
+      this.MAX_MESSAGES_PER_SECOND = await config.get('MAX_MESSAGES_PER_SECOND');
+      this.RATE_LIMIT_WINDOW_MS = await config.get('RATE_LIMIT_WINDOW_MS');
+      this.MAX_CONNECTIONS_PER_DO = await config.get('MAX_CONNECTIONS_PER_DO');
+      this.AUTO_REVEAL_DELAY_MS = await config.get('AUTO_REVEAL_DELAY_MS');
+
+      // Update log level
+      const logLevel = await config.get('LOG_LEVEL');
+      CURRENT_LOG_LEVEL = LogLevel[logLevel as keyof typeof LogLevel] ?? LogLevel.WARN;
+
+      config.destroy();
+      this.configLoaded = true;
+
+      logger.info('Config loaded from feature flags', {
+        MAX_MESSAGE_SIZE: this.MAX_MESSAGE_SIZE,
+        HEARTBEAT_INTERVAL_MS: this.HEARTBEAT_INTERVAL_MS,
+        LOG_LEVEL: logLevel,
+      });
+    } catch (error) {
+      logger.error('Failed to load config, using defaults', error);
+      this.configLoaded = true; // Don't retry on every request
+    }
+  }
+
   override async fetch(request: Request): Promise<Response> {
+    // Load config on first request
+    await this.loadConfig();
+
     // Handle WebSocket upgrade requests
     if (request.headers.get("upgrade") === "websocket") {
       return this.handleWebSocketUpgrade(request);
