@@ -7,7 +7,6 @@ interface Env {
   POKER_ROOM: DurableObjectNamespace
   ASSETS: Fetcher
   FLAGS_CACHE: KVNamespace
-  GROWTHBOOK_SDK_KEY?: string
 }
 
 export default {
