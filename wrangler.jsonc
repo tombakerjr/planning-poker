@@ -22,7 +22,22 @@
 			"new_classes": ["PokerRoom"]
 		}
 	],
+	"kv_namespaces": [
+		{
+			"binding": "FLAGS_CACHE",
+			"id": "fe262ec19b90476a9a2bff55d7292f58"
+		}
+	],
 	"observability": {
-		"enabled": true
+		"enabled": true,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"invocation_logs": true
+		},
+		"traces": {
+			"enabled": true,
+			"head_sampling_rate": 1
+		}
 	}
 }
