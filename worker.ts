@@ -48,7 +48,7 @@ export default {
 </head>
 <body>
   <div class="container">
-    <h1>🔧 Under Maintenance</h1>
+    <h1>🔧 Under Maintenance 🔧</h1>
     <p>Planning Poker is temporarily unavailable for scheduled maintenance.</p>
     <p>We'll be back shortly. Thank you for your patience!</p>
   </div>
