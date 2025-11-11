@@ -6,12 +6,11 @@ import { createConfig } from '../utils/config'
  * Returns all feature flags for client-side consumption.
  * Clients poll this endpoint every 10 seconds.
  *
- * Caching strategy is handled by the config service:
- * - Fresh cache (< 5 min): served from KV
- * - Stale cache or miss: fetch from GrowthBook, fallback to stale/defaults
+ * Flags are read from KV where GrowthBook webhook pushes updates.
+ * No network requests to GrowthBook at runtime - instant updates via webhook.
  */
 export default defineEventHandler(async (event) => {
-  const env = event.context.cloudflare.env as Env & { GROWTHBOOK_SDK_KEY?: string }
+  const env = event.context.cloudflare.env as Env
   const config = createConfig(env)
 
   try {
