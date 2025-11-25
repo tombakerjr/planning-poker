@@ -16,7 +16,7 @@ Production URL: https://planning-poker.tombaker.workers.dev
 - **Database**: Cloudflare D1 (configured for future persistence)
 - **Styling**: Tailwind CSS
 - **Testing**: Vitest with @cloudflare/vitest-pool-workers
-- **Package Manager**: pnpm (v10.15.0)
+- **Package Manager**: pnpm (v10.19.0)
 - **Node Version**: v22 (LTS)
 
 ## Essential Commands
@@ -57,6 +57,21 @@ vitest server/poker-room.test.ts
 pnpm test --run
 ```
 
+### End-to-End Testing
+```bash
+# Run all E2E tests (requires dev server running)
+pnpm test:e2e
+
+# Run E2E tests with UI
+pnpm test:e2e:ui
+
+# Run E2E tests in debug mode
+pnpm test:e2e:debug
+
+# Run specific E2E test file
+pnpm test:e2e e2e/room-creation.spec.ts
+```
+
 ### Type Generation
 ```bash
 # Generate Cloudflare Workers types from wrangler.jsonc
@@ -85,7 +100,9 @@ Request → worker.ts
           └─ /* → .output/server/index.mjs (Nuxt)
 ```
 
-**Key file**: `worker.ts:14-25` - WebSocket routing logic intercepts upgrade requests before they reach Nuxt.
+**Key file**: `worker.ts:80-93` - WebSocket routing logic intercepts upgrade requests before they reach Nuxt.
+
+**Kill Switch**: The worker includes a master kill switch (`APP_ENABLED` flag) that returns a maintenance page (503) when disabled. Flag values are cached for 60 seconds to minimize KV reads.
 
 ### Durable Object (PokerRoom)
 
@@ -112,6 +129,7 @@ Each room is a Durable Object instance that:
 - Session recovery: `ws.deserializeAttachment()` restores user state after hibernation
 - Rate limiting: 10 messages/second per connection, max 100 connections per DO
 - Heartbeat cleanup: `heartbeatIntervals` Map tracks intervals to prevent memory leaks
+- Feature flags: Configurable via GrowthBook SDK Webhooks (stored in FLAGS_CACHE KV)
 
 ### Client State Management
 
@@ -279,7 +297,7 @@ The client attempts reconnection with exponential backoff (max 10 attempts). Aft
 All WebSocket messages follow this structure:
 ```typescript
 {
-  type: 'join' | 'vote' | 'reveal' | 'reset' | 'update' | 'error' | 'ping' | 'pong',
+  type: 'join' | 'vote' | 'reveal' | 'reset' | 'setStory' | 'setScale' | 'setAutoReveal' | 'update' | 'error' | 'ping' | 'pong',
   payload?: any
 }
 ```
@@ -331,13 +349,59 @@ pnpm deploy
 - Observability enabled in `wrangler.jsonc`
 - View logs in Cloudflare Dashboard → Workers & Pages → planning-poker → Logs
 
+### Feature Flags (GrowthBook)
+Feature flags are managed via GrowthBook SDK Webhooks:
+- **Location**: `server/utils/config.ts`
+- **Storage**: FLAGS_CACHE KV namespace
+- **Updates**: GrowthBook pushes payload to KV via webhook (instant updates)
+- **Fallback**: Hardcoded defaults if KV read fails
+
+Available flags:
+```typescript
+APP_ENABLED: boolean           // Master kill switch
+HEARTBEAT_INTERVAL_MS: number  // WebSocket heartbeat interval
+AUTO_REVEAL_DELAY_MS: number   // Delay before auto-reveal
+MAX_MESSAGE_SIZE: number       // Max WebSocket message size
+MAX_CONNECTIONS_PER_DO: number // Max connections per Durable Object
+MAX_MESSAGES_PER_SECOND: number // Rate limit
+RATE_LIMIT_WINDOW_MS: number   // Rate limit window
+LOG_LEVEL: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+```
+
+#### Production KV Setup
+The `FLAGS_CACHE` KV namespace ID is **not committed** to version control for security.
+
+**To configure production:**
+1. Go to Cloudflare Dashboard → Workers & Pages → planning-poker
+2. Click **Settings** → **Bindings**
+3. Add a KV Namespace binding:
+   - Variable name: `FLAGS_CACHE`
+   - KV Namespace: Select your production namespace (or create one)
+4. Save and deploy
+
+**Local development** uses the preview namespace configured in `wrangler.jsonc` automatically.
+
 ## File References
 
 When discussing code, use the pattern `file_path:line_number` for clarity:
-- `worker.ts:14-25` - WebSocket routing logic
-- `server/poker-room.ts:278-291` - Heartbeat implementation
-- `composables/usePokerRoom.ts:150-164` - Reconnection logic
+- `worker.ts:80-93` - WebSocket routing logic
+- `server/poker-room.ts:688-711` - Heartbeat implementation
+- `composables/usePokerRoom.ts:426-477` - Reconnection logic
+- `server/utils/config.ts` - Feature flag configuration
 
 ## Additional Context
 
 See `CONTEXT.md` for project overview and `IMPLEMENTATION_PLAN.md` for completed implementation phases and known issues.
+
+## Serena Memories
+
+When using Serena MCP tools, the following memories are available for quick reference:
+- **project_overview**: Core architecture, message protocol, key features
+- **tech_stack**: Dependencies, versions, feature flags configuration
+- **codebase_structure**: Directory layout, key file locations
+- **suggested_commands**: All CLI commands for dev, test, build, deploy
+- **code_style_conventions**: TypeScript, Vue, Tailwind patterns
+- **testing_guide**: Vitest, Playwright, debugging tips
+- **task_completion_checklist**: Step-by-step checklist for completing tasks
+
+Use `mcp__serena__read_memory` to access these when working on specific areas.

@@ -33,6 +33,7 @@ export interface RoomMessage {
   type: 'update' | 'error' | 'ping' | 'pong'
   payload?: any
   id?: number  // For ping/pong latency measurement
+  maintenance?: boolean  // True when server is in maintenance mode
 }
 
 export interface QueuedMessage {
@@ -82,6 +83,10 @@ export function usePokerRoom(roomId: string) {
   const networkState = ref<NetworkState>('online')
   const lastSuccessfulPong = ref<number>(Date.now())
   const missedPongs = ref<number>(0)
+
+  // Maintenance mode (received from server via pong)
+  // Use global state so app.vue can show maintenance overlay
+  const maintenance = useState('maintenance-mode', () => false)
 
   // Message queue
   const messageQueue = ref<QueuedMessage[]>([])
@@ -281,6 +286,11 @@ export function usePokerRoom(roomId: string) {
         missedPongs.value = 0
         if (networkState.value === 'unstable') {
           networkState.value = 'online'
+        }
+
+        // Check for maintenance mode from server
+        if (message.maintenance !== undefined) {
+          maintenance.value = message.maintenance
         }
         break
 
@@ -881,6 +891,7 @@ export function usePokerRoom(roomId: string) {
     jitter,
     networkState: readonly(networkState),
     queuedMessageCount,
+    maintenance: readonly(maintenance),
 
     // Computed
     myVote,

@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { createConfig } from './utils/config'
 
 // Simple logging utility for Durable Objects
 enum LogLevel {
@@ -8,10 +9,11 @@ enum LogLevel {
   ERROR = 3,
 }
 
-const LOG_LEVEL = LogLevel.WARN; // Only log warnings and errors in production
+// Global log level - will be set from config
+let CURRENT_LOG_LEVEL = LogLevel.WARN;
 
 function log(level: LogLevel, message: string, ...args: any[]) {
-  if (level < LOG_LEVEL) return;
+  if (level < CURRENT_LOG_LEVEL) return;
 
   const timestamp = new Date().toISOString();
   const levelName = LogLevel[level];
@@ -40,19 +42,19 @@ const logger = {
   error: (msg: string, ...args: any[]) => log(LogLevel.ERROR, msg, ...args),
 };
 
-const MAX_MESSAGE_SIZE = 1024 * 10; // 10KB
+// Non-configurable constants
 const MAX_NAME_LENGTH = 50;
-const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 
-// Rate limiting constants
-const MAX_MESSAGES_PER_SECOND = 10;
-const RATE_LIMIT_WINDOW_MS = 1000; // 1 second
-const MAX_CONNECTIONS_PER_DO = 100;
-
+// Default values for configurable constants (loaded from GrowthBook feature flags)
+const DEFAULT_MAX_MESSAGE_SIZE = 1024 * 10; // 10KB
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
+const DEFAULT_MAX_MESSAGES_PER_SECOND = 10;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 1000; // 1 second
+const DEFAULT_MAX_CONNECTIONS_PER_DO = 100;
 // Auto-reveal delay prevents race where last voter doesn't see their vote update
 // before reveal. 150ms balances UX (fast reveal) with reliability (WebSocket latency + React render).
-// Without delay, the last voter's UI may not update before votes are revealed.
-const AUTO_REVEAL_DELAY_MS = 150;
+const DEFAULT_AUTO_REVEAL_DELAY_MS = 150;
+const DEFAULT_APP_ENABLED = true;
 
 // Voting scale definitions (must match client-side definitions)
 const VALID_SCALES = ['fibonacci', 'modified-fibonacci', 't-shirt', 'powers-of-2', 'linear'] as const;
@@ -110,6 +112,7 @@ interface PingMessage {
 interface PongMessage {
   type: "pong";
   id?: number;  // Optional for backward compatibility
+  maintenance?: boolean;  // True when app is in maintenance mode
 }
 
 interface SetStoryMessage {
@@ -155,7 +158,64 @@ export class PokerRoom extends DurableObject {
   private broadcastDebounceTimeout?: number;
   private autoRevealTimeout?: number;
 
+  // Configurable values loaded from feature flags
+  private MAX_MESSAGE_SIZE = DEFAULT_MAX_MESSAGE_SIZE;
+  private HEARTBEAT_INTERVAL_MS = DEFAULT_HEARTBEAT_INTERVAL_MS;
+  private MAX_MESSAGES_PER_SECOND = DEFAULT_MAX_MESSAGES_PER_SECOND;
+  private RATE_LIMIT_WINDOW_MS = DEFAULT_RATE_LIMIT_WINDOW_MS;
+  private MAX_CONNECTIONS_PER_DO = DEFAULT_MAX_CONNECTIONS_PER_DO;
+  private AUTO_REVEAL_DELAY_MS = DEFAULT_AUTO_REVEAL_DELAY_MS;
+  private APP_ENABLED = DEFAULT_APP_ENABLED;
+  private configLoadedAt = 0;
+  private CONFIG_TTL = 60000; // 60 seconds (match worker kill switch cache for consistent maintenance propagation)
+
+  /**
+   * Load configuration from feature flags
+   * Includes retry mechanism with TTL to handle temporary KV outages
+   */
+  private async loadConfig(): Promise<void> {
+    const now = Date.now();
+
+    // Check if config is still fresh (within TTL)
+    if (this.configLoadedAt && now - this.configLoadedAt < this.CONFIG_TTL) {
+      return;
+    }
+
+    try {
+      const config = createConfig(this.env as Env);
+
+      // Load all config values
+      this.MAX_MESSAGE_SIZE = await config.get('MAX_MESSAGE_SIZE');
+      this.HEARTBEAT_INTERVAL_MS = await config.get('HEARTBEAT_INTERVAL_MS');
+      this.MAX_MESSAGES_PER_SECOND = await config.get('MAX_MESSAGES_PER_SECOND');
+      this.RATE_LIMIT_WINDOW_MS = await config.get('RATE_LIMIT_WINDOW_MS');
+      this.MAX_CONNECTIONS_PER_DO = await config.get('MAX_CONNECTIONS_PER_DO');
+      this.AUTO_REVEAL_DELAY_MS = await config.get('AUTO_REVEAL_DELAY_MS');
+      this.APP_ENABLED = await config.get('APP_ENABLED');
+
+      // Update log level
+      const logLevel = await config.get('LOG_LEVEL');
+      CURRENT_LOG_LEVEL = LogLevel[logLevel as keyof typeof LogLevel] ?? LogLevel.WARN;
+
+      config.destroy();
+      this.configLoadedAt = now;
+
+      logger.info('Config loaded from feature flags', {
+        MAX_MESSAGE_SIZE: this.MAX_MESSAGE_SIZE,
+        HEARTBEAT_INTERVAL_MS: this.HEARTBEAT_INTERVAL_MS,
+        LOG_LEVEL: logLevel,
+      });
+    } catch (error) {
+      logger.error('Failed to load config, using defaults', error);
+      // Set configLoadedAt anyway to prevent retry spam, but allow retry after TTL
+      this.configLoadedAt = now;
+    }
+  }
+
   override async fetch(request: Request): Promise<Response> {
+    // Load config on first request
+    await this.loadConfig();
+
     // Handle WebSocket upgrade requests
     if (request.headers.get("upgrade") === "websocket") {
       return this.handleWebSocketUpgrade(request);
@@ -167,7 +227,7 @@ export class PokerRoom extends DurableObject {
   private async handleWebSocketUpgrade(_request: Request): Promise<Response> {
     // Check connection limit
     const currentConnections = this.ctx.getWebSockets().length;
-    if (currentConnections >= MAX_CONNECTIONS_PER_DO) {
+    if (currentConnections >= this.MAX_CONNECTIONS_PER_DO) {
       return new Response("Too many connections", { status: 429 });
     }
 
@@ -218,7 +278,7 @@ export class PokerRoom extends DurableObject {
       return;
     }
 
-    if (message.length > MAX_MESSAGE_SIZE) {
+    if (message.length > this.MAX_MESSAGE_SIZE) {
       logger.warn(`Message too large: ${message.length} bytes`);
       ws.close(1009, "Message too large");
       return;
@@ -253,7 +313,13 @@ export class PokerRoom extends DurableObject {
       // Handle ping/pong for heartbeat
       if (parsed.type === "ping") {
         // Echo back the ping ID for latency measurement (backward compatible)
-        ws.send(JSON.stringify({ type: "pong", id: parsed.id }));
+        // Include maintenance flag so clients can show maintenance UI
+        const pong: PongMessage = {
+          type: "pong",
+          id: parsed.id,
+          maintenance: !this.APP_ENABLED
+        };
+        ws.send(JSON.stringify(pong));
         return;
       }
 
@@ -371,7 +437,7 @@ export class PokerRoom extends DurableObject {
               logger.error("Auto-reveal failed:", err);
             });
             this.autoRevealTimeout = undefined;
-          }, AUTO_REVEAL_DELAY_MS) as unknown as number;
+          }, this.AUTO_REVEAL_DELAY_MS) as unknown as number;
         }
 
         // Early return since we've already persisted and broadcasted
@@ -641,7 +707,7 @@ export class PokerRoom extends DurableObject {
         logger.error("Failed to send ping:", error);
         this.stopHeartbeat(ws);
       }
-    }, HEARTBEAT_INTERVAL_MS) as unknown as number;
+    }, this.HEARTBEAT_INTERVAL_MS) as unknown as number;
 
     this.heartbeatIntervals.set(ws, intervalId);
   }
@@ -668,7 +734,7 @@ export class PokerRoom extends DurableObject {
     }
 
     // Check if we're in a new window
-    if (now - rateLimit.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    if (now - rateLimit.windowStart >= this.RATE_LIMIT_WINDOW_MS) {
       // Reset to new window
       rateLimit.messageCount = 1;
       rateLimit.windowStart = now;
@@ -679,7 +745,7 @@ export class PokerRoom extends DurableObject {
     rateLimit.messageCount++;
 
     // Check if limit exceeded
-    if (rateLimit.messageCount > MAX_MESSAGES_PER_SECOND) {
+    if (rateLimit.messageCount > this.MAX_MESSAGES_PER_SECOND) {
       return false;
     }
 

@@ -22,7 +22,26 @@
 			"new_classes": ["PokerRoom"]
 		}
 	],
+	// KV namespace for feature flags (GrowthBook webhook payload)
+	// - id/preview_id: Points to dev/test namespace (safe to commit)
+	// - Production binding configured via wrangler deploy (persists across Git-integrated deployments)
+	"kv_namespaces": [
+		{
+			"binding": "FLAGS_CACHE",
+			"id": "f97e08d3c29540038fa28380e9080787",
+			"preview_id": "f97e08d3c29540038fa28380e9080787"
+		}
+	],
 	"observability": {
-		"enabled": true
+		"enabled": true,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"invocation_logs": true
+		},
+		"traces": {
+			"enabled": true,
+			"head_sampling_rate": 1
+		}
 	}
 }
