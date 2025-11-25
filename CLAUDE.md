@@ -368,6 +368,19 @@ RATE_LIMIT_WINDOW_MS: number   // Rate limit window
 LOG_LEVEL: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
 ```
 
+#### Production KV Setup
+The `FLAGS_CACHE` KV namespace ID is **not committed** to version control for security.
+
+**To configure production:**
+1. Go to Cloudflare Dashboard → Workers & Pages → planning-poker
+2. Click **Settings** → **Bindings**
+3. Add a KV Namespace binding:
+   - Variable name: `FLAGS_CACHE`
+   - KV Namespace: Select your production namespace (or create one)
+4. Save and deploy
+
+**Local development** uses the preview namespace configured in `wrangler.jsonc` automatically.
+
 ## File References
 
 When discussing code, use the pattern `file_path:line_number` for clarity:

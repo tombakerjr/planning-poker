@@ -22,10 +22,15 @@
 			"new_classes": ["PokerRoom"]
 		}
 	],
+	// KV namespace for feature flags (GrowthBook webhook payload)
+	// - id/preview_id: Points to dev/test namespace (safe to commit)
+	// - PRODUCTION: Override binding in Cloudflare Dashboard > Workers > planning-poker > Settings > Bindings
+	//   This keeps the production namespace ID out of version control
 	"kv_namespaces": [
 		{
 			"binding": "FLAGS_CACHE",
-			"id": "fe262ec19b90476a9a2bff55d7292f58"
+			"id": "f97e08d3c29540038fa28380e9080787",
+			"preview_id": "f97e08d3c29540038fa28380e9080787"
 		}
 	],
 	"observability": {
