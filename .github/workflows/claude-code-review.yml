@@ -64,3 +64,57 @@ jobs:
             --max-turns 25
             --allowedTools Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)
 
+  # Experimental: Concise review format for comparison
+  claude-review-concise:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review (Concise)
+        id: claude-review-concise
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          use_sticky_comment: true
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR TITLE: ${{ github.event.pull_request.title }}
+
+            Review this PR. Read CLAUDE.md for project context.
+
+            **Output format (STRICTLY follow this):**
+
+            If issues found:
+            ```
+            🔴 CRITICAL: [one-line description]
+            🟡 ISSUE: [one-line description]
+            💡 SUGGESTION: [one-line description]
+            ```
+
+            If clean: `✅ LGTM`
+
+            **Rules:**
+            - MAX 10 items total
+            - One line per item (50 words max)
+            - Only flag: security holes, bugs, missing tests for new code
+            - Skip: style, minor improvements, "nice to haves"
+            - No preamble, no summary, no sign-off
+
+            Post review via `gh pr comment`. Start comment with "**[Concise Review]**"
+
+          claude_args: |
+            --max-turns 25
+            --allowedTools Read,Glob,Grep,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)
+
