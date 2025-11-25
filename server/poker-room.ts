@@ -167,7 +167,7 @@ export class PokerRoom extends DurableObject {
   private AUTO_REVEAL_DELAY_MS = DEFAULT_AUTO_REVEAL_DELAY_MS;
   private APP_ENABLED = DEFAULT_APP_ENABLED;
   private configLoadedAt = 0;
-  private CONFIG_TTL = 300000; // 5 minutes
+  private CONFIG_TTL = 60000; // 60 seconds (match worker kill switch cache for consistent maintenance propagation)
 
   /**
    * Load configuration from feature flags
