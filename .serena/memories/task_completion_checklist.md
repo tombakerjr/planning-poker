@@ -29,22 +29,20 @@ When completing a task or implementing a feature, follow this checklist:
 
 ## 5. Documentation
 - [ ] Update CLAUDE.md if architecture changed
+- [ ] Update Serena memories if significant changes
 - [ ] Add code comments where necessary
-- [ ] Document new patterns or conventions
-- [ ] Update relevant .md files (CONTEXT.md, IMPLEMENTATION_PLAN.md, README.md, etc.)
 
 ## 6. Git Workflow
-- [ ] Create feature branch from main: `git checkout -b phase{X}-{description}`
-- [ ] Commit changes with clear message: `git commit -m "Phase X: Description"`
+- [ ] Create feature branch from main: `git checkout -b feature/{description}`
+- [ ] Commit changes with clear message
 - [ ] Push to remote: `git push origin {branch-name}`
 
 ## 7. Pull Request
-- [ ] Create PR: `gh pr create --title "Phase X: Description" --body "..."`
+- [ ] Create PR: `gh pr create --title "Description" --body "..."`
 - [ ] Wait for automated checks (2-3 minutes):
   - Claude Code review comments
   - Cloudflare deployment check
 - [ ] Review and address feedback
-- [ ] Push additional commits if needed
 - [ ] Wait for human review and merge
 
 ## 8. Common Pitfalls to Avoid
@@ -58,23 +56,26 @@ When completing a task or implementing a feature, follow this checklist:
 - [ ] Test theme switching if modifying UI components
 
 ## 9. Feature-Specific Checks
-- [ ] **Voting scales**: Ensure new scales are added to VALID_SCALES and SCALE_VALUES
-- [ ] **Auto-reveal**: Test with various participant counts and voting patterns
-- [ ] **WebSocket messages**: Update both server (poker-room.ts) and client (usePokerRoom.ts)
-- [ ] **State changes**: Broadcast updates to all connected clients
-- [ ] **UI changes**: Test in both light and dark modes
+
+### Feature Flags
+- [ ] Add new flags to `server/utils/config.ts` FlagDefaults interface
+- [ ] Add hardcoded defaults in DEFAULTS object
+- [ ] Test with flags disabled/enabled
+- [ ] Document new flags in tech_stack memory
+
+### Voting Scales
+- [ ] Ensure new scales are added to VALID_SCALES and SCALE_VALUES
+- [ ] Test scale switching mid-session
+
+### WebSocket Messages
+- [ ] Update both server (poker-room.ts) and client (usePokerRoom.ts)
+- [ ] Broadcast updates to all connected clients
+
+### UI Changes
+- [ ] Test in both light and dark modes
+- [ ] Test mobile responsiveness
 
 ## 10. Monitoring After Deploy
 - [ ] Check Cloudflare Dashboard → Workers & Pages → planning-poker → Logs
 - [ ] Verify production deployment: https://planning-poker.tombaker.workers.dev
 - [ ] Test the feature in production
-
-## Standard GitHub Issue Workflow Summary
-1. Start from main branch
-2. Create feature branch: `phase{X}-{description}`
-3. Implement + test + document
-4. Commit and push
-5. Open PR with `gh pr create`
-6. Wait for automated checks
-7. Address feedback
-8. Wait for human review and merge

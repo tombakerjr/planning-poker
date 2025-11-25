@@ -6,6 +6,7 @@
 - **Deployment**: Cloudflare Workers (single-worker architecture)
 - **Real-time**: Cloudflare Durable Objects with WebSocket Hibernation API
 - **Database**: Cloudflare D1 (configured for future persistence)
+- **Feature Flags**: GrowthBook SDK Webhooks with FLAGS_CACHE KV namespace
 - **Styling**: Tailwind CSS (v4.1.11+)
 
 ## Development Tools
@@ -32,9 +33,20 @@
 - **@playwright/test**: E2E testing (v1.56.1+)
 
 ## Configuration Files
-- `wrangler.jsonc`: Defines Durable Object bindings, compatibility date (2025-06-28), observability
+- `wrangler.jsonc`: Defines Durable Object bindings, KV namespaces (FLAGS_CACHE), compatibility date (2025-06-28), observability
 - `nuxt.config.ts`: Nitro preset (cloudflare_module), compatibility version 4
 - `vitest.config.ts`: Uses vitest-pool-workers for Durable Object testing
 - `playwright.config.ts`: E2E test configuration
 - `tsconfig.json`: Extends .nuxt/tsconfig.json with worker types
 - `tailwind.config.ts`: Tailwind CSS v4 configuration
+
+## Feature Flags (via GrowthBook)
+Available flags configured in `server/utils/config.ts`:
+- `APP_ENABLED`: Master kill switch
+- `HEARTBEAT_INTERVAL_MS`: WebSocket heartbeat interval (default 30000)
+- `AUTO_REVEAL_DELAY_MS`: Delay before auto-reveal (default 150)
+- `MAX_MESSAGE_SIZE`: Max WebSocket message size (default 10240)
+- `MAX_CONNECTIONS_PER_DO`: Max connections per Durable Object (default 100)
+- `MAX_MESSAGES_PER_SECOND`: Rate limit (default 10)
+- `RATE_LIMIT_WINDOW_MS`: Rate limit window (default 1000)
+- `LOG_LEVEL`: DEBUG | INFO | WARN | ERROR (default WARN)

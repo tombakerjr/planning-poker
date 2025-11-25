@@ -13,10 +13,14 @@ The app uses a custom worker entrypoint (`worker.ts`) that routes requests:
 1. **WebSocket requests** (`/api/room/[id]/ws`) → Durable Object (PokerRoom)
 2. **All other requests** → Nuxt/Nitro handler
 
+### Kill Switch
+Master kill switch (`APP_ENABLED` flag) returns maintenance page (503) when disabled. Flag values cached 60 seconds to minimize KV reads.
+
 ### Key Components
 - **Durable Objects**: Each poker room is a Durable Object instance managing WebSocket connections using the Hibernation API
+- **Feature Flags**: GrowthBook SDK Webhooks with FLAGS_CACHE KV namespace
 - **State Management**: In-memory state with session persistence via `ws.serializeAttachment()`
-- **Real-time**: WebSocket communication with heartbeat pings every 30 seconds
+- **Real-time**: WebSocket communication with configurable heartbeat (default 30s)
 - **Client-side**: Auto-reconnection with exponential backoff (max 10 attempts)
 
 ### Room State Structure
@@ -50,3 +54,4 @@ All WebSocket messages follow:
 - **Host**: Cloudflare Workers
 - **CI/CD**: Automatic deployments via Cloudflare Dashboard GitHub integration on pushes to `main` branch
 - **Monitoring**: Observability enabled in wrangler.jsonc
+- **Feature Flags**: GrowthBook SDK Webhooks for instant flag updates
