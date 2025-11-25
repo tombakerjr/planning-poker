@@ -24,8 +24,7 @@
 	],
 	// KV namespace for feature flags (GrowthBook webhook payload)
 	// - id/preview_id: Points to dev/test namespace (safe to commit)
-	// - PRODUCTION: Override binding in Cloudflare Dashboard > Workers > planning-poker > Settings > Bindings
-	//   This keeps the production namespace ID out of version control
+	// - Production binding configured via wrangler deploy (persists across Git-integrated deployments)
 	"kv_namespaces": [
 		{
 			"binding": "FLAGS_CACHE",
