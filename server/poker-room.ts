@@ -54,6 +54,7 @@ const DEFAULT_MAX_CONNECTIONS_PER_DO = 100;
 // Auto-reveal delay prevents race where last voter doesn't see their vote update
 // before reveal. 150ms balances UX (fast reveal) with reliability (WebSocket latency + React render).
 const DEFAULT_AUTO_REVEAL_DELAY_MS = 150;
+const DEFAULT_APP_ENABLED = true;
 
 // Voting scale definitions (must match client-side definitions)
 const VALID_SCALES = ['fibonacci', 'modified-fibonacci', 't-shirt', 'powers-of-2', 'linear'] as const;
@@ -111,6 +112,7 @@ interface PingMessage {
 interface PongMessage {
   type: "pong";
   id?: number;  // Optional for backward compatibility
+  maintenance?: boolean;  // True when app is in maintenance mode
 }
 
 interface SetStoryMessage {
@@ -163,6 +165,7 @@ export class PokerRoom extends DurableObject {
   private RATE_LIMIT_WINDOW_MS = DEFAULT_RATE_LIMIT_WINDOW_MS;
   private MAX_CONNECTIONS_PER_DO = DEFAULT_MAX_CONNECTIONS_PER_DO;
   private AUTO_REVEAL_DELAY_MS = DEFAULT_AUTO_REVEAL_DELAY_MS;
+  private APP_ENABLED = DEFAULT_APP_ENABLED;
   private configLoadedAt = 0;
   private CONFIG_TTL = 300000; // 5 minutes
 
@@ -188,6 +191,7 @@ export class PokerRoom extends DurableObject {
       this.RATE_LIMIT_WINDOW_MS = await config.get('RATE_LIMIT_WINDOW_MS');
       this.MAX_CONNECTIONS_PER_DO = await config.get('MAX_CONNECTIONS_PER_DO');
       this.AUTO_REVEAL_DELAY_MS = await config.get('AUTO_REVEAL_DELAY_MS');
+      this.APP_ENABLED = await config.get('APP_ENABLED');
 
       // Update log level
       const logLevel = await config.get('LOG_LEVEL');
@@ -309,7 +313,13 @@ export class PokerRoom extends DurableObject {
       // Handle ping/pong for heartbeat
       if (parsed.type === "ping") {
         // Echo back the ping ID for latency measurement (backward compatible)
-        ws.send(JSON.stringify({ type: "pong", id: parsed.id }));
+        // Include maintenance flag so clients can show maintenance UI
+        const pong: PongMessage = {
+          type: "pong",
+          id: parsed.id,
+          maintenance: !this.APP_ENABLED
+        };
+        ws.send(JSON.stringify(pong));
         return;
       }
 
