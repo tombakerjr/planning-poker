@@ -92,29 +92,36 @@ jobs:
             PR NUMBER: ${{ github.event.pull_request.number }}
             PR TITLE: ${{ github.event.pull_request.title }}
 
-            Review this PR. Read CLAUDE.md for project context.
+            Review this PR for actionable issues only. Read CLAUDE.md and .serena/memories/ for context.
 
-            **Output format (STRICTLY follow this):**
+            **What to report:**
+            - 🔴 CRITICAL: Security vulnerabilities, data loss bugs, crashes
+            - 🟡 FIX: Bugs, logic errors, missing error handling
+            - 🟠 TEST: Missing tests for new/changed code paths
+            - 💡 CONSIDER: Non-trivial improvements worth discussing
 
-            If issues found:
+            **What NOT to report:**
+            - Don't summarize what the PR does (assume I read the description)
+            - Don't list what's good or praise the code
+            - Skip style nitpicks, minor refactors, "nice to haves"
+            - Skip issues already mentioned in the PR description as known limitations
+
+            **Special case:**
+            - If PR description is misleading or doesn't match the code, add: 📝 UPDATE PR: [what's wrong]
+
+            **Format:**
             ```
-            🔴 CRITICAL: [one-line description]
-            🟡 ISSUE: [one-line description]
-            💡 SUGGESTION: [one-line description]
+            🔴 CRITICAL: file.ts:123 - SQL injection in user input
+            🟡 FIX: api.ts:45 - Missing null check causes crash
+            🟠 TEST: No tests for the new retry logic
+            💡 CONSIDER: Cache could cause stale data for 60s
             ```
 
-            If clean: `✅ LGTM`
+            If no actionable issues: `✅ LGTM - no blocking issues`
 
-            **Rules:**
-            - MAX 10 items total
-            - One line per item (50 words max)
-            - Only flag: security holes, bugs, missing tests for new code
-            - Skip: style, minor improvements, "nice to haves"
-            - No preamble, no summary, no sign-off
-
-            Post review via `gh pr comment`. Start comment with "**[Concise Review]**"
+            Post via `gh pr comment`. Prefix with "**[Concise Review]**"
 
           claude_args: |
-            --max-turns 25
-            --allowedTools Read,Glob,Grep,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)
+            --max-turns 30
+            --allowedTools Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)
 
