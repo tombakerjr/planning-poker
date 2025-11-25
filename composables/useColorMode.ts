@@ -8,11 +8,20 @@ const STORAGE_KEY = 'planning-poker-theme'
 const preference = ref<ColorMode>('system')
 const isDark = ref(false)
 
+// Track if we've already initialized on client
+let clientInitialized = false
+
 export function useColorMode() {
   // Get system preference
   const getSystemPreference = (): boolean => {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(prefers-color-scheme: dark)').matches
+  }
+
+  // Check if dark class is present on document (set by inline script)
+  const getDarkFromDOM = (): boolean => {
+    if (typeof document === 'undefined') return false
+    return document.documentElement.classList.contains('dark')
   }
 
   // Apply theme to DOM
@@ -39,6 +48,20 @@ export function useColorMode() {
   const loadPreference = () => {
     if (typeof window === 'undefined') return
 
+    const stored = localStorage.getItem(STORAGE_KEY) as ColorMode | null
+    if (stored && ['light', 'dark', 'system'].includes(stored)) {
+      preference.value = stored
+    }
+  }
+
+  // Bug fix: Immediately sync state on client before first render
+  // This prevents hydration mismatch where inline script set dark class
+  // but Vue refs still have default values
+  if (typeof window !== 'undefined' && !clientInitialized) {
+    clientInitialized = true
+    // Sync isDark with actual DOM state (set by inline script in nuxt.config.ts)
+    isDark.value = getDarkFromDOM()
+    // Load stored preference to keep refs in sync
     const stored = localStorage.getItem(STORAGE_KEY) as ColorMode | null
     if (stored && ['light', 'dark', 'system'].includes(stored)) {
       preference.value = stored

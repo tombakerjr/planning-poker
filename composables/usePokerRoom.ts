@@ -94,7 +94,8 @@ export function usePokerRoom(roomId: string) {
   let ws: WebSocket | null = null
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
-  let reconnectAttempts = 0
+  // Bug fix: Use ref for reconnectAttempts so UI updates reactively
+  const reconnectAttemptsRef = ref<number>(0)
   let pingId = 0
   let pingTimestamps = new Map<number, number>()
 
@@ -387,11 +388,14 @@ export function usePokerRoom(roomId: string) {
           logger.debug('WebSocket connection opened')
         }
 
-        const wasReconnecting = reconnectAttempts > 0
+        const wasReconnecting = reconnectAttemptsRef.value > 0
         const hasQueuedMessages = messageQueue.value.length > 0
 
         status.value = 'OPEN'
-        reconnectAttempts = 0 // Reset reconnection counter on successful connection
+        // Bug fix: Set connectionQuality to 'fair' immediately on connection
+        // before first pong response (prevents showing "Disconnected" while connected)
+        connectionQuality.value = 'fair'
+        reconnectAttemptsRef.value = 0 // Reset reconnection counter on successful connection
 
         // Send authentication message
         if (ws) {
@@ -435,7 +439,7 @@ export function usePokerRoom(roomId: string) {
 
         // Attempt to reconnect with exponential backoff
         if (event.code !== 1000) { // 1000 = normal closure
-          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          if (reconnectAttemptsRef.value >= MAX_RECONNECT_ATTEMPTS) {
             logger.error('Max reconnection attempts reached. Please refresh the page.')
             status.value = 'CLOSED'
             networkState.value = 'offline'
@@ -448,23 +452,23 @@ export function usePokerRoom(roomId: string) {
           connectionQuality.value = 'disconnected'
 
           // Calculate delay with jitter
-          const delay = calculateReconnectDelay(reconnectAttempts)
+          const delay = calculateReconnectDelay(reconnectAttemptsRef.value)
           if (IS_DEV) {
-            logger.debug(`Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+            logger.debug(`Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttemptsRef.value + 1}/${MAX_RECONNECT_ATTEMPTS})`)
           }
 
           // Progressive toast messages
-          if (reconnectAttempts === 0) {
+          if (reconnectAttemptsRef.value === 0) {
             toast.warning('Connection lost. Reconnecting...', delay + 1000)
-          } else if (reconnectAttempts === 5) {
+          } else if (reconnectAttemptsRef.value === 5) {
             toast.warning('Still reconnecting... This may take a moment.', delay + 1000)
-          } else if (reconnectAttempts >= 10) {
+          } else if (reconnectAttemptsRef.value >= 10) {
             toast.error('Connection issues persist. Check your network.', delay + 1000)
           }
 
           reconnectTimeout = setTimeout(() => {
             if (status.value === 'RECONNECTING') {
-              reconnectAttempts++
+              reconnectAttemptsRef.value++
               connectToRoom()
             }
           }, delay)
@@ -873,8 +877,6 @@ export function usePokerRoom(roomId: string) {
     closeConnection()
   })
 
-  const reconnectAttemptsRef = computed(() => reconnectAttempts)
-
   return {
     // State
     roomState: readonly(roomState),
@@ -882,7 +884,7 @@ export function usePokerRoom(roomId: string) {
     isJoined: readonly(isJoined),
     status,
     isLoading: readonly(isLoading),
-    reconnectAttempts: reconnectAttemptsRef,
+    reconnectAttempts: readonly(reconnectAttemptsRef),
 
     // Connection quality monitoring
     connectionQuality: readonly(connectionQuality),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { logger } from '~/server/utils/logger'
+// Bug fix: Removed server logger import (server code should not be imported in client components)
 import { PokerRoomKey } from '~/composables/usePokerRoom'
 import { useVotingScale } from '~/composables/useVotingScale'
 
@@ -54,7 +54,7 @@ watch(() => roomState.value.votesRevealed, (newRevealed, oldRevealed) => {
 
 function handleSelect(value: string | number) {
   if (!isJoined.value) {
-    logger.warn('Must join room before voting')
+    console.warn('[VotingArea] Must join room before voting')
     return
   }
 

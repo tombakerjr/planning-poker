@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { logger } from '~/server/utils/logger'
+// Bug fix: Use console.error directly instead of server logger import
+// (server code should not be imported in client components)
 
-const roomName = ref('')
 const isCreating = ref(false)
 const error = ref('')
 
@@ -20,16 +20,10 @@ async function createRoom() {
     // Navigate to the new room
     await navigateTo(`/room/${response.roomId}`)
   } catch (err: any) {
-    logger.error('Error creating room:', err)
+    console.error('[CreateRoom] Error creating room:', err)
     error.value = err.message || 'Failed to create room. Please try again.'
   } finally {
     isCreating.value = false
-  }
-}
-
-function handleKeyPress(event: KeyboardEvent) {
-  if (event.key === 'Enter') {
-    createRoom()
   }
 }
 </script>
@@ -93,21 +87,9 @@ function handleKeyPress(event: KeyboardEvent) {
               </div>
             </div>
 
-            <div>
-              <label for="roomName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 transition-colors duration-200">
-                Room Name (Optional)
-              </label>
-              <input
-                id="roomName"
-                v-model="roomName"
-                type="text"
-                placeholder="e.g., Sprint Planning - Team Alpha"
-                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-700 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-200"
-                @keypress="handleKeyPress"
-                :disabled="isCreating"
-              />
-            </div>
-            
+            <!-- Bug fix: Removed unused roomName input field -->
+            <!-- Room naming can be implemented as a future feature with server-side support -->
+
             <button
               @click="createRoom"
               :disabled="isCreating"
