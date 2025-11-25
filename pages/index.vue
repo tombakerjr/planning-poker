@@ -107,6 +107,14 @@ async function createRoom() {
           </div>
         </div>
 
+        <!-- Recent Rooms Section -->
+        <div class="mt-6">
+          <RecentRooms />
+        </div>
+
+        <!-- Session History Section -->
+        <SessionHistory />
+
         <!-- Features Section -->
         <div class="mt-8 text-center">
           <h4 class="text-lg font-semibold text-gray-800 dark:text-white mb-4 transition-colors duration-200">Features</h4>
