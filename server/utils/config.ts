@@ -35,6 +35,7 @@ const PAYLOAD_KEY = 'gb_payload'
  */
 export class Config {
   private flags: Partial<FlagDefaults> | null = null
+  private flagsPromise: Promise<Partial<FlagDefaults>> | null = null
 
   constructor(
     private env: Env,
@@ -81,14 +82,30 @@ export class Config {
   }
 
   /**
+   * Ensure flags are loaded, using Promise memoization to prevent concurrent KV reads
+   */
+  private async ensureFlags(): Promise<Partial<FlagDefaults>> {
+    if (this.flags) {
+      return this.flags
+    }
+
+    // Use Promise memoization: concurrent calls wait on the same Promise
+    if (!this.flagsPromise) {
+      this.flagsPromise = this.fetchFlags().then(flags => {
+        this.flags = flags
+        return flags
+      })
+    }
+
+    return this.flagsPromise
+  }
+
+  /**
    * Get a feature flag value by key
    */
   async get<K extends keyof FlagDefaults>(key: K): Promise<FlagDefaults[K]> {
-    if (!this.flags) {
-      this.flags = await this.fetchFlags()
-    }
-
-    const value = this.flags[key]
+    const flags = await this.ensureFlags()
+    const value = flags[key]
     return value !== undefined ? value : DEFAULTS[key]
   }
 
@@ -96,13 +113,10 @@ export class Config {
    * Get all flags as an object
    */
   async getAll(): Promise<FlagDefaults> {
-    if (!this.flags) {
-      this.flags = await this.fetchFlags()
-    }
-
+    const flags = await this.ensureFlags()
     return {
       ...DEFAULTS,
-      ...this.flags,
+      ...flags,
     }
   }
 

@@ -7,12 +7,12 @@ interface FlagsResponse {
   timestamp: number
 }
 
-const POLL_INTERVAL_MS = 10000 // 10 seconds
+const POLL_INTERVAL_MS = 60000 // 60 seconds (matches server cache TTL)
 
 /**
  * Client-side feature flags composable
  *
- * Polls /api/flags every 10 seconds and provides reactive access to feature flags.
+ * Polls /api/flags every 60 seconds and provides reactive access to feature flags.
  * Flags are cached in localStorage as a backup.
  */
 export function useFeatureFlags() {

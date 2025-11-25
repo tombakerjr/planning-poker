@@ -182,7 +182,7 @@ export class PokerRoom extends DurableObject {
     }
 
     try {
-      const config = createConfig(this.env as any);
+      const config = createConfig(this.env as Env);
 
       // Load all config values
       this.MAX_MESSAGE_SIZE = await config.get('MAX_MESSAGE_SIZE');
