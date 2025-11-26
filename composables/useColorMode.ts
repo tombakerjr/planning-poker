@@ -1,18 +1,27 @@
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { watch, onMounted, onUnmounted } from 'vue'
 
 export type ColorMode = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'planning-poker-theme'
 
-// Global state for theme
-const preference = ref<ColorMode>('system')
-const isDark = ref(false)
-
 export function useColorMode() {
+  // Use Nuxt's useState for SSR-safe global state
+  // Unlike module-level refs, useState is isolated per request in SSR
+  const preference = useState<ColorMode>('theme-preference', () => 'system')
+  const isDark = useState<boolean>('theme-is-dark', () => false)
+  // Track initialization to prevent duplicate syncs across component instances
+  const clientInitialized = useState<boolean>('theme-client-initialized', () => false)
+
   // Get system preference
   const getSystemPreference = (): boolean => {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(prefers-color-scheme: dark)').matches
+  }
+
+  // Check if dark class is present on document (set by inline script)
+  const getDarkFromDOM = (): boolean => {
+    if (typeof document === 'undefined') return false
+    return document.documentElement.classList.contains('dark')
   }
 
   // Apply theme to DOM
@@ -45,6 +54,17 @@ export function useColorMode() {
     }
   }
 
+  // Sync state on client before first render to prevent hydration mismatch.
+  // The inline script in nuxt.config.ts sets the 'dark' class synchronously,
+  // but Vue's useState defaults to false. We sync once per client session.
+  if (typeof window !== 'undefined' && !clientInitialized.value) {
+    clientInitialized.value = true
+    // Sync isDark with actual DOM state (set by inline script in nuxt.config.ts)
+    isDark.value = getDarkFromDOM()
+    // Load stored preference to keep refs in sync
+    loadPreference()
+  }
+
   // Save preference to localStorage
   const savePreference = (mode: ColorMode) => {
     if (typeof window === 'undefined') return
@@ -72,7 +92,8 @@ export function useColorMode() {
 
   // Initialize on client-side
   onMounted(() => {
-    loadPreference()
+    // Note: loadPreference() already called in init block (lines 60-66)
+    // for first component instance. Skip here since useState persists the value.
     updateTheme()
 
     // Listen for system theme changes

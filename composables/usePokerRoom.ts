@@ -85,7 +85,10 @@ export function usePokerRoom(roomId: string) {
   const missedPongs = ref<number>(0)
 
   // Maintenance mode (received from server via pong)
-  // Use global state so app.vue can show maintenance overlay
+  // INTENTIONALLY global (not room-scoped): When the server enters maintenance mode,
+  // ALL rooms should show the overlay. This allows app.vue to display the maintenance
+  // message regardless of which room the user is in. The server broadcasts maintenance
+  // status via pong messages to all connected clients.
   const maintenance = useState('maintenance-mode', () => false)
 
   // Message queue
@@ -94,7 +97,8 @@ export function usePokerRoom(roomId: string) {
   let ws: WebSocket | null = null
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
-  let reconnectAttempts = 0
+  // Bug fix: Use ref for reconnectAttempts so UI updates reactively
+  const reconnectAttemptsRef = ref<number>(0)
   let pingId = 0
   let pingTimestamps = new Map<number, number>()
 
@@ -387,11 +391,15 @@ export function usePokerRoom(roomId: string) {
           logger.debug('WebSocket connection opened')
         }
 
-        const wasReconnecting = reconnectAttempts > 0
+        const wasReconnecting = reconnectAttemptsRef.value > 0
         const hasQueuedMessages = messageQueue.value.length > 0
 
         status.value = 'OPEN'
-        reconnectAttempts = 0 // Reset reconnection counter on successful connection
+        // Set connectionQuality to 'fair' as temporary state while awaiting first pong
+        // This prevents showing "Disconnected" during the brief window before latency is measured.
+        // The actual quality will be calculated from real measurements within ~100ms.
+        connectionQuality.value = 'fair'
+        reconnectAttemptsRef.value = 0 // Reset reconnection counter on successful connection
 
         // Send authentication message
         if (ws) {
@@ -435,7 +443,7 @@ export function usePokerRoom(roomId: string) {
 
         // Attempt to reconnect with exponential backoff
         if (event.code !== 1000) { // 1000 = normal closure
-          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          if (reconnectAttemptsRef.value >= MAX_RECONNECT_ATTEMPTS) {
             logger.error('Max reconnection attempts reached. Please refresh the page.')
             status.value = 'CLOSED'
             networkState.value = 'offline'
@@ -448,23 +456,23 @@ export function usePokerRoom(roomId: string) {
           connectionQuality.value = 'disconnected'
 
           // Calculate delay with jitter
-          const delay = calculateReconnectDelay(reconnectAttempts)
+          const delay = calculateReconnectDelay(reconnectAttemptsRef.value)
           if (IS_DEV) {
-            logger.debug(`Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+            logger.debug(`Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttemptsRef.value + 1}/${MAX_RECONNECT_ATTEMPTS})`)
           }
 
           // Progressive toast messages
-          if (reconnectAttempts === 0) {
+          if (reconnectAttemptsRef.value === 0) {
             toast.warning('Connection lost. Reconnecting...', delay + 1000)
-          } else if (reconnectAttempts === 5) {
+          } else if (reconnectAttemptsRef.value === 5) {
             toast.warning('Still reconnecting... This may take a moment.', delay + 1000)
-          } else if (reconnectAttempts >= 10) {
+          } else if (reconnectAttemptsRef.value >= 10) {
             toast.error('Connection issues persist. Check your network.', delay + 1000)
           }
 
           reconnectTimeout = setTimeout(() => {
             if (status.value === 'RECONNECTING') {
-              reconnectAttempts++
+              reconnectAttemptsRef.value++
               connectToRoom()
             }
           }, delay)
@@ -493,36 +501,47 @@ export function usePokerRoom(roomId: string) {
     pingTimestamps.clear()
     latencyMeasurements.value = []
     currentLatency.value = null
+    connectionQuality.value = 'disconnected'
+    reconnectAttemptsRef.value = 0
 
     status.value = 'CLOSED'
   }
 
   const startHeartbeat = () => {
     stopHeartbeat()
-    // Send ping to keep connection alive and measure latency
-    heartbeatInterval = setInterval(() => {
+
+    // Helper to send a ping and track it for latency measurement
+    const sendPing = () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         const currentPingId = pingId++
         pingTimestamps.set(currentPingId, Date.now())
         ws.send(JSON.stringify({ type: 'ping', id: currentPingId }))
+      }
+    }
 
-        // Check if we haven't received a pong recently
-        const timeSinceLastPong = Date.now() - lastSuccessfulPong.value
-        if (timeSinceLastPong > HEARTBEAT_TIMEOUT_MS) {
-          missedPongs.value++
+    // Send immediate ping to get latency measurement quickly after connection
+    sendPing()
 
-          if (IS_DEV) {
-            logger.debug(`Missed pong (${missedPongs.value}/${MAX_MISSED_PONGS})`)
-          }
+    // Then send periodic pings to keep connection alive and monitor latency
+    heartbeatInterval = setInterval(() => {
+      sendPing()
 
-          if (missedPongs.value >= MAX_MISSED_PONGS) {
-            logger.warn('Multiple missed pongs - connection unstable')
-            networkState.value = 'unstable'
-            // Force reconnection
-            ws.close()
-          } else {
-            networkState.value = 'unstable'
-          }
+      // Check if we haven't received a pong recently
+      const timeSinceLastPong = Date.now() - lastSuccessfulPong.value
+      if (timeSinceLastPong > HEARTBEAT_TIMEOUT_MS) {
+        missedPongs.value++
+
+        if (IS_DEV) {
+          logger.debug(`Missed pong (${missedPongs.value}/${MAX_MISSED_PONGS})`)
+        }
+
+        if (missedPongs.value >= MAX_MISSED_PONGS) {
+          logger.warn('Multiple missed pongs - connection unstable')
+          networkState.value = 'unstable'
+          // Force reconnection
+          if (ws) ws.close()
+        } else {
+          networkState.value = 'unstable'
         }
       }
     }, HEARTBEAT_INTERVAL_MS)
@@ -873,8 +892,6 @@ export function usePokerRoom(roomId: string) {
     closeConnection()
   })
 
-  const reconnectAttemptsRef = computed(() => reconnectAttempts)
-
   return {
     // State
     roomState: readonly(roomState),
@@ -882,7 +899,7 @@ export function usePokerRoom(roomId: string) {
     isJoined: readonly(isJoined),
     status,
     isLoading: readonly(isLoading),
-    reconnectAttempts: reconnectAttemptsRef,
+    reconnectAttempts: readonly(reconnectAttemptsRef),
 
     // Connection quality monitoring
     connectionQuality: readonly(connectionQuality),
