@@ -1,17 +1,19 @@
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { watch, onMounted, onUnmounted } from 'vue'
 
 export type ColorMode = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'planning-poker-theme'
 
-// Global state for theme
-const preference = ref<ColorMode>('system')
-const isDark = ref(false)
-
-// Track if we've already initialized on client
+// Track if we've already initialized on client (this is safe as module-level
+// because it's a primitive that only matters client-side)
 let clientInitialized = false
 
 export function useColorMode() {
+  // Use Nuxt's useState for SSR-safe global state
+  // Unlike module-level refs, useState is isolated per request in SSR
+  const preference = useState<ColorMode>('theme-preference', () => 'system')
+  const isDark = useState<boolean>('theme-is-dark', () => false)
+
   // Get system preference
   const getSystemPreference = (): boolean => {
     if (typeof window === 'undefined') return false

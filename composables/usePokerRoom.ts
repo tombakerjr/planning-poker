@@ -392,8 +392,9 @@ export function usePokerRoom(roomId: string) {
         const hasQueuedMessages = messageQueue.value.length > 0
 
         status.value = 'OPEN'
-        // Bug fix: Set connectionQuality to 'fair' immediately on connection
-        // before first pong response (prevents showing "Disconnected" while connected)
+        // Set connectionQuality to 'fair' as temporary state while awaiting first pong
+        // This prevents showing "Disconnected" during the brief window before latency is measured.
+        // The actual quality will be calculated from real measurements within ~100ms.
         connectionQuality.value = 'fair'
         reconnectAttemptsRef.value = 0 // Reset reconnection counter on successful connection
 
@@ -497,36 +498,47 @@ export function usePokerRoom(roomId: string) {
     pingTimestamps.clear()
     latencyMeasurements.value = []
     currentLatency.value = null
+    connectionQuality.value = 'disconnected'
+    reconnectAttemptsRef.value = 0
 
     status.value = 'CLOSED'
   }
 
   const startHeartbeat = () => {
     stopHeartbeat()
-    // Send ping to keep connection alive and measure latency
-    heartbeatInterval = setInterval(() => {
+
+    // Helper to send a ping and track it for latency measurement
+    const sendPing = () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         const currentPingId = pingId++
         pingTimestamps.set(currentPingId, Date.now())
         ws.send(JSON.stringify({ type: 'ping', id: currentPingId }))
+      }
+    }
 
-        // Check if we haven't received a pong recently
-        const timeSinceLastPong = Date.now() - lastSuccessfulPong.value
-        if (timeSinceLastPong > HEARTBEAT_TIMEOUT_MS) {
-          missedPongs.value++
+    // Send immediate ping to get latency measurement quickly after connection
+    sendPing()
 
-          if (IS_DEV) {
-            logger.debug(`Missed pong (${missedPongs.value}/${MAX_MISSED_PONGS})`)
-          }
+    // Then send periodic pings to keep connection alive and monitor latency
+    heartbeatInterval = setInterval(() => {
+      sendPing()
 
-          if (missedPongs.value >= MAX_MISSED_PONGS) {
-            logger.warn('Multiple missed pongs - connection unstable')
-            networkState.value = 'unstable'
-            // Force reconnection
-            ws.close()
-          } else {
-            networkState.value = 'unstable'
-          }
+      // Check if we haven't received a pong recently
+      const timeSinceLastPong = Date.now() - lastSuccessfulPong.value
+      if (timeSinceLastPong > HEARTBEAT_TIMEOUT_MS) {
+        missedPongs.value++
+
+        if (IS_DEV) {
+          logger.debug(`Missed pong (${missedPongs.value}/${MAX_MISSED_PONGS})`)
+        }
+
+        if (missedPongs.value >= MAX_MISSED_PONGS) {
+          logger.warn('Multiple missed pongs - connection unstable')
+          networkState.value = 'unstable'
+          // Force reconnection
+          if (ws) ws.close()
+        } else {
+          networkState.value = 'unstable'
         }
       }
     }, HEARTBEAT_INTERVAL_MS)
