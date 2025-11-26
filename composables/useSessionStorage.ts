@@ -54,6 +54,35 @@ export interface UserPreferences {
 const MAX_RECENT_ROOMS = 10
 const MAX_SESSION_HISTORY = 10
 
+// Track if quota warning has been shown (avoid spamming console)
+let quotaWarningShown = false
+
+// Helper to safely write to localStorage with quota handling
+function safeLocalStorageSet(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch (error) {
+    // Handle QuotaExceededError (name varies by browser)
+    const isQuotaError = error instanceof DOMException && (
+      error.name === 'QuotaExceededError' ||
+      error.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||  // Firefox
+      error.code === 22  // Legacy Safari
+    )
+
+    if (isQuotaError) {
+      if (!quotaWarningShown) {
+        console.warn('[SessionStorage] localStorage quota exceeded. Older data may be pruned.')
+        quotaWarningShown = true
+      }
+      return false
+    }
+
+    // Re-throw non-quota errors
+    throw error
+  }
+}
+
 // Global state (singleton pattern)
 const recentRooms = ref<RecentRoom[]>([])
 const sessionHistory = ref<SessionHistory[]>([])
@@ -114,19 +143,38 @@ export function useSessionStorage() {
     }
   }
 
-  // Save recent rooms to localStorage
+  // Save recent rooms to localStorage with quota handling
   function saveRecentRooms() {
     try {
-      localStorage.setItem(STORAGE_KEYS.RECENT_ROOMS, JSON.stringify(recentRooms.value))
+      const data = JSON.stringify(recentRooms.value)
+      if (!safeLocalStorageSet(STORAGE_KEYS.RECENT_ROOMS, data)) {
+        // Quota exceeded - prune oldest entries and retry
+        if (recentRooms.value.length > 5) {
+          recentRooms.value = recentRooms.value.slice(0, 5)
+          safeLocalStorageSet(STORAGE_KEYS.RECENT_ROOMS, JSON.stringify(recentRooms.value))
+        }
+      }
     } catch (error) {
       console.error('[SessionStorage] Failed to save recent rooms:', error)
     }
   }
 
-  // Save session history to localStorage
+  // Save session history to localStorage with quota handling
   function saveSessionHistory() {
     try {
-      localStorage.setItem(STORAGE_KEYS.SESSION_HISTORY, JSON.stringify(sessionHistory.value))
+      const data = JSON.stringify(sessionHistory.value)
+      if (!safeLocalStorageSet(STORAGE_KEYS.SESSION_HISTORY, data)) {
+        // Quota exceeded - prune oldest sessions (keep rounds minimal) and retry
+        if (sessionHistory.value.length > 5) {
+          // Keep fewer sessions and truncate rounds data
+          const pruned = sessionHistory.value.slice(0, 5).map(s => ({
+            ...s,
+            rounds: s.rounds.slice(0, 3),  // Keep only last 3 rounds per session
+          }))
+          sessionHistory.value = pruned
+          safeLocalStorageSet(STORAGE_KEYS.SESSION_HISTORY, JSON.stringify(pruned))
+        }
+      }
     } catch (error) {
       console.error('[SessionStorage] Failed to save session history:', error)
     }
@@ -135,7 +183,11 @@ export function useSessionStorage() {
   // Save user preferences to localStorage
   function saveUserPreferences() {
     try {
-      localStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(userPreferences.value))
+      const data = JSON.stringify(userPreferences.value)
+      if (!safeLocalStorageSet(STORAGE_KEYS.USER_PREFERENCES, data)) {
+        // Preferences are small - if quota exceeded, something is very wrong
+        console.warn('[SessionStorage] Could not save preferences - storage full')
+      }
     } catch (error) {
       console.error('[SessionStorage] Failed to save preferences:', error)
     }
@@ -247,6 +299,25 @@ export function useSessionStorage() {
     return JSON.stringify(exportData, null, 2)
   }
 
+  // Escape a string value for CSV (handles quotes, formula injection, newlines)
+  function escapeCSVValue(value: string | number): string {
+    const str = String(value)
+    // Check if value needs quoting (contains comma, quote, newline, or formula chars)
+    const needsQuoting = /[,"\r\n]/.test(str) || /^[=+\-@\t\r]/.test(str)
+
+    if (!needsQuoting) return str
+
+    // Escape formula injection by prefixing with single quote (Excel/Sheets safe)
+    // This prevents =, +, -, @, tab, and carriage return from being interpreted as formulas
+    let escaped = str
+    if (/^[=+\-@\t\r]/.test(str)) {
+      escaped = "'" + str
+    }
+
+    // Escape quotes by doubling them, then wrap in quotes
+    return `"${escaped.replace(/"/g, '""')}"`
+  }
+
   // Export session history to CSV
   function exportToCSV(): string {
     const headers = [
@@ -268,15 +339,15 @@ export function useSessionStorage() {
       const stories = session.rounds.map(r => r.storyTitle).filter(Boolean).join('; ')
 
       return [
-        session.roomId,
-        session.userName,
+        escapeCSVValue(session.roomId),
+        escapeCSVValue(session.userName),
         new Date(session.joinedAt).toISOString(),
         session.leftAt ? new Date(session.leftAt).toISOString() : 'N/A',
         duration,
         session.participantCount,
         session.roundCount,
-        session.votingScale,
-        `"${stories.replace(/"/g, '""')}"`,  // Escape quotes for CSV
+        escapeCSVValue(session.votingScale),
+        escapeCSVValue(stories),
       ].join(',')
     })
 

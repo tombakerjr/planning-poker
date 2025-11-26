@@ -68,6 +68,8 @@ export function usePokerRoom(roomId: string) {
   // Session tracking state for history
   const sessionJoinedAt = ref<number | null>(null)
   const completedRounds = ref<VotingRound[]>([])
+  // Flag to prevent double-saving session (leaveRoom + onUnmounted)
+  let sessionSaved = false
 
   const roomState = ref<RoomState>({
     participants: [],
@@ -889,7 +891,9 @@ export function usePokerRoom(roomId: string) {
 
   const leaveRoom = () => {
     // Save session to history before leaving (Phase 6)
-    if (sessionJoinedAt.value && currentUser.value) {
+    // Only save once - prevents duplicate saves if leaveRoom called before unmount
+    if (sessionJoinedAt.value && currentUser.value && !sessionSaved) {
+      sessionSaved = true
       sessionStorage.addSessionToHistory({
         roomId,
         userName: currentUser.value.name,
@@ -946,7 +950,9 @@ export function usePokerRoom(roomId: string) {
   // Clean up on component unmount
   onUnmounted(() => {
     // Save session to history when component unmounts (Phase 6)
-    if (sessionJoinedAt.value && currentUser.value) {
+    // Only save if not already saved by leaveRoom()
+    if (sessionJoinedAt.value && currentUser.value && !sessionSaved) {
+      sessionSaved = true
       sessionStorage.addSessionToHistory({
         roomId,
         userName: currentUser.value.name,
