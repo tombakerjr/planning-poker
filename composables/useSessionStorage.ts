@@ -301,21 +301,22 @@ export function useSessionStorage() {
 
   // Escape a string value for CSV (handles quotes, formula injection, newlines)
   function escapeCSVValue(value: string | number): string {
-    const str = String(value)
-    // Check if value needs quoting (contains comma, quote, newline, or formula chars)
-    const needsQuoting = /[,"\r\n]/.test(str) || /^[=+\-@\t\r]/.test(str)
+    let str = String(value)
 
-    if (!needsQuoting) return str
-
-    // Escape formula injection by prefixing with single quote (Excel/Sheets safe)
-    // This prevents =, +, -, @, tab, and carriage return from being interpreted as formulas
-    let escaped = str
+    // Prevent CSV formula injection by prefixing with space
+    // Characters that spreadsheets interpret as formulas: =, +, -, @, tab, CR
+    // Space prefix is invisible in most spreadsheets and prevents formula execution
     if (/^[=+\-@\t\r]/.test(str)) {
-      escaped = "'" + str
+      str = ' ' + str
     }
 
-    // Escape quotes by doubling them, then wrap in quotes
-    return `"${escaped.replace(/"/g, '""')}"`
+    // Check if value needs quoting (contains comma, quote, or newline)
+    if (/[,"\r\n]/.test(str)) {
+      // Escape quotes by doubling them, then wrap in quotes
+      return `"${str.replace(/"/g, '""')}"`
+    }
+
+    return str
   }
 
   // Export session history to CSV

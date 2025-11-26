@@ -910,6 +910,8 @@ export function usePokerRoom(roomId: string) {
     isJoined.value = false
     sessionJoinedAt.value = null
     completedRounds.value = []
+    // Reset sessionSaved so future sessions can be saved (e.g., if user rejoins)
+    sessionSaved = false
     roomState.value = {
       participants: [],
       votesRevealed: false,
@@ -930,7 +932,8 @@ export function usePokerRoom(roomId: string) {
   // Watch for votes revealed to track completed rounds (Phase 6)
   watch(() => roomState.value.votesRevealed, (revealed, wasRevealed) => {
     // When votes are revealed (transition from hidden to revealed)
-    if (revealed && !wasRevealed && isJoined.value) {
+    // Check wasRevealed !== undefined to avoid false positive on initial render/reconnect
+    if (revealed && wasRevealed === false && isJoined.value) {
       const votes: Record<string, string | number | null> = {}
       roomState.value.participants.forEach(p => {
         votes[p.name] = p.vote
