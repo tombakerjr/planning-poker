@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { usePokerRoom, PokerRoomKey } from '~/composables/usePokerRoom'
+import { useSessionStorage } from '~/composables/useSessionStorage'
 import type { VotingScaleType } from '~/composables/useVotingScale'
 
 const route = useRoute()
 const roomId = route.params.id as string
 
-// Initialize the poker room composable
+// Initialize composables
 const pokerRoom = usePokerRoom(roomId)
+const { userPreferences, updatePreferences } = useSessionStorage()
 
 // Provide the poker room to child components with type safety
 provide(PokerRoomKey, pokerRoom)
@@ -29,14 +31,16 @@ const {
   setAutoReveal,
 } = pokerRoom
 
-// Handle scale changes - send to server, which will broadcast to all clients
+// Handle scale changes - send to server and save preference (Phase 6)
 const handleScaleChange = (scaleType: VotingScaleType) => {
   setVotingScale(scaleType)
+  updatePreferences({ defaultVotingScale: scaleType })
 }
 
-// Handle auto-reveal toggle
+// Handle auto-reveal toggle - send to server and save preference (Phase 6)
 const handleAutoRevealChange = (value: boolean) => {
   setAutoReveal(value)
+  updatePreferences({ autoReveal: value })
 }
 
 const showNameModal = ref(true)

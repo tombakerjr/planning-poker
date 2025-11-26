@@ -1,6 +1,7 @@
-import { ref, computed, readonly, onUnmounted, type InjectionKey } from 'vue'
+import { ref, computed, readonly, onUnmounted, watch, type InjectionKey } from 'vue'
 import { nanoid } from 'nanoid'
 import { useToast } from './useToast'
+import { useSessionStorage, type VotingRound } from './useSessionStorage'
 
 // Client-side logger implementation
 // Note: Cannot import ~/server/utils/logger here because:
@@ -62,6 +63,13 @@ const IS_DEV = process.env.NODE_ENV === 'development'
 
 export function usePokerRoom(roomId: string) {
   const toast = useToast()
+  const sessionStorage = useSessionStorage()
+
+  // Session tracking state for history
+  const sessionJoinedAt = ref<number | null>(null)
+  const completedRounds = ref<VotingRound[]>([])
+  // Flag to prevent double-saving session (leaveRoom + onUnmounted)
+  let sessionSaved = false
 
   const roomState = ref<RoomState>({
     participants: [],
@@ -682,6 +690,14 @@ export function usePokerRoom(roomId: string) {
       // Save session for recovery
       saveUserSession(userId, trimmedName)
 
+      // Track session for recent rooms (Phase 6)
+      sessionJoinedAt.value = Date.now()
+      sessionStorage.addRecentRoom({
+        roomId,
+        name: trimmedName,
+        storyTitle: roomState.value.storyTitle || undefined,
+      })
+
       // Send join message via WebSocket
       ws.send(JSON.stringify({
         type: 'join',
@@ -874,9 +890,28 @@ export function usePokerRoom(roomId: string) {
   }
 
   const leaveRoom = () => {
+    // Save session to history before leaving (Phase 6)
+    // Only save once - prevents duplicate saves if leaveRoom called before unmount
+    if (sessionJoinedAt.value && currentUser.value && !sessionSaved) {
+      sessionSaved = true
+      sessionStorage.addSessionToHistory({
+        roomId,
+        userName: currentUser.value.name,
+        joinedAt: sessionJoinedAt.value,
+        participantCount: roomState.value.participants.length,
+        roundCount: completedRounds.value.length,
+        rounds: completedRounds.value,
+        votingScale: roomState.value.votingScale || 'fibonacci',
+      })
+    }
+
     closeConnection()
     currentUser.value = null
     isJoined.value = false
+    sessionJoinedAt.value = null
+    completedRounds.value = []
+    // Reset sessionSaved so future sessions can be saved (e.g., if user rejoins)
+    sessionSaved = false
     roomState.value = {
       participants: [],
       votesRevealed: false,
@@ -887,8 +922,50 @@ export function usePokerRoom(roomId: string) {
     // Don't clear session on leave - keep it for potential rejoin
   }
 
+  // Watch for story title changes to update recent rooms (Phase 6)
+  watch(() => roomState.value.storyTitle, (newTitle) => {
+    if (newTitle && isJoined.value) {
+      sessionStorage.updateRecentRoomStory(roomId, newTitle)
+    }
+  })
+
+  // Watch for votes revealed to track completed rounds (Phase 6)
+  watch(() => roomState.value.votesRevealed, (revealed, wasRevealed) => {
+    // When votes are revealed (transition from hidden to revealed)
+    // Check wasRevealed !== undefined to avoid false positive on initial render/reconnect
+    if (revealed && wasRevealed === false && isJoined.value) {
+      const votes: Record<string, string | number | null> = {}
+      roomState.value.participants.forEach(p => {
+        votes[p.name] = p.vote
+      })
+
+      completedRounds.value.push({
+        storyTitle: roomState.value.storyTitle || 'Untitled',
+        votes,
+        average: averageVote.value,
+        median: medianVote.value,
+        consensus: consensusPercentage.value,
+        completedAt: Date.now(),
+      })
+    }
+  })
+
   // Clean up on component unmount
   onUnmounted(() => {
+    // Save session to history when component unmounts (Phase 6)
+    // Only save if not already saved by leaveRoom()
+    if (sessionJoinedAt.value && currentUser.value && !sessionSaved) {
+      sessionSaved = true
+      sessionStorage.addSessionToHistory({
+        roomId,
+        userName: currentUser.value.name,
+        joinedAt: sessionJoinedAt.value,
+        participantCount: roomState.value.participants.length,
+        roundCount: completedRounds.value.length,
+        rounds: completedRounds.value,
+        votingScale: roomState.value.votingScale || 'fibonacci',
+      })
+    }
     closeConnection()
   })
 
