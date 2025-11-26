@@ -92,7 +92,8 @@ export function useColorMode() {
 
   // Initialize on client-side
   onMounted(() => {
-    loadPreference()
+    // Note: loadPreference() already called in init block (lines 60-66)
+    // for first component instance. Skip here since useState persists the value.
     updateTheme()
 
     // Listen for system theme changes
