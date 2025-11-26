@@ -4,15 +4,13 @@ export type ColorMode = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'planning-poker-theme'
 
-// Track if we've already initialized on client (this is safe as module-level
-// because it's a primitive that only matters client-side)
-let clientInitialized = false
-
 export function useColorMode() {
   // Use Nuxt's useState for SSR-safe global state
   // Unlike module-level refs, useState is isolated per request in SSR
   const preference = useState<ColorMode>('theme-preference', () => 'system')
   const isDark = useState<boolean>('theme-is-dark', () => false)
+  // Track initialization to prevent duplicate syncs across component instances
+  const clientInitialized = useState<boolean>('theme-client-initialized', () => false)
 
   // Get system preference
   const getSystemPreference = (): boolean => {
@@ -56,18 +54,15 @@ export function useColorMode() {
     }
   }
 
-  // Bug fix: Immediately sync state on client before first render
-  // This prevents hydration mismatch where inline script set dark class
-  // but Vue refs still have default values
-  if (typeof window !== 'undefined' && !clientInitialized) {
-    clientInitialized = true
+  // Sync state on client before first render to prevent hydration mismatch.
+  // The inline script in nuxt.config.ts sets the 'dark' class synchronously,
+  // but Vue's useState defaults to false. We sync once per client session.
+  if (typeof window !== 'undefined' && !clientInitialized.value) {
+    clientInitialized.value = true
     // Sync isDark with actual DOM state (set by inline script in nuxt.config.ts)
     isDark.value = getDarkFromDOM()
     // Load stored preference to keep refs in sync
-    const stored = localStorage.getItem(STORAGE_KEY) as ColorMode | null
-    if (stored && ['light', 'dark', 'system'].includes(stored)) {
-      preference.value = stored
-    }
+    loadPreference()
   }
 
   // Save preference to localStorage

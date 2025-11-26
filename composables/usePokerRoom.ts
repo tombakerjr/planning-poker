@@ -85,7 +85,10 @@ export function usePokerRoom(roomId: string) {
   const missedPongs = ref<number>(0)
 
   // Maintenance mode (received from server via pong)
-  // Use global state so app.vue can show maintenance overlay
+  // INTENTIONALLY global (not room-scoped): When the server enters maintenance mode,
+  // ALL rooms should show the overlay. This allows app.vue to display the maintenance
+  // message regardless of which room the user is in. The server broadcasts maintenance
+  // status via pong messages to all connected clients.
   const maintenance = useState('maintenance-mode', () => false)
 
   // Message queue
