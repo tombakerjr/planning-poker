@@ -7,17 +7,11 @@ import { useVotingScale } from '~/composables/useVotingScale';
 const pokerRoom = inject(PokerRoomKey);
 if (!pokerRoom) throw new Error('PokerRoom not provided');
 
-const { roomState, isJoined, vote, myVote, votingComplete, averageVote, medianVote, consensusPercentage, setStoryTitle } = pokerRoom;
+const { roomState, isJoined, vote, myVote, votingComplete, setStoryTitle } = pokerRoom;
 
 // Use voting scale composable with the room's current scale
 const { currentScale } = useVotingScale(computed(() => roomState.value.votingScale));
 const pokerDeck = computed(() => currentScale.value.values);
-
-// Check if current scale supports numeric statistics
-const supportsNumericStats = computed(() => {
-  // Only show stats for scales with numeric values
-  return ['fibonacci', 'modified-fibonacci', 'powers-of-2', 'linear'].includes(currentScale.value.id);
-});
 
 const selectedValue = ref<string | number | null>(null);
 const isEditingStory = ref(false);
@@ -228,130 +222,71 @@ function handleStoryKeydown(event: KeyboardEvent) {
       </div>
     </div>
 
-    <!-- Voting disabled message -->
-    <div
-      v-if="!isJoined"
-      class="mb-4 text-center"
-    >
-      <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">
-        Join the room to start voting
-      </p>
-    </div>
-
-    <div 
-      class="grid grid-cols-3 justify-items-center gap-4 sm:grid-cols-5"
-      :class="{ 'opacity-50 pointer-events-none': !isJoined }"
-    >
-      <Card
-        v-for="cardValue in pokerDeck"
-        :key="cardValue"
-        :value="cardValue"
-        :selected="selectedValue === cardValue"
-        @select="handleSelect(cardValue)"
+    <!-- Statistics View (shown when votes revealed) -->
+    <div v-if="roomState.votesRevealed">
+      <VotingStatistics
+        :participants="roomState.participants"
+        :scale-type="currentScale.id"
       />
     </div>
 
-    <div class="mt-8 text-center">
-      <p class="text-gray-600 dark:text-gray-300 transition-colors duration-200">
-        Your vote:
-      </p>
-      <p class="min-h-[48px] text-4xl font-bold text-blue-600 dark:text-blue-400 transition-colors duration-200">
-        {{ selectedValue ?? '...' }}
-      </p>
-      <!-- Vote changed indicator -->
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0 scale-95"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-95"
+    <!-- Voting View (shown when voting in progress) -->
+    <template v-else>
+      <!-- Voting disabled message -->
+      <div
+        v-if="!isJoined"
+        class="mb-4 text-center"
       >
-        <p
-          v-if="voteChanged"
-          class="mt-2 inline-block rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 text-sm font-medium text-yellow-800 dark:text-yellow-300 transition-colors duration-200"
-        >
-          Vote changed
+        <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">
+          Join the room to start voting
         </p>
-      </Transition>
-    </div>
-
-    <!-- Voting status -->
-    <div
-      v-if="isJoined"
-      class="mt-4 text-center"
-    >
-      <div
-        v-if="roomState.votesRevealed && supportsNumericStats && (averageVote !== null || medianVote !== null)"
-        class="space-y-2"
-      >
-        <!-- Statistics Grid -->
-        <div class="grid grid-cols-3 gap-3 text-sm">
-          <div
-            v-if="averageVote !== null"
-            class="rounded-lg bg-blue-50 dark:bg-blue-900/30 p-3 transition-colors duration-200"
-          >
-            <p class="text-xs text-gray-600 dark:text-gray-300 transition-colors duration-200">
-              Average
-            </p>
-            <p class="text-lg font-bold text-blue-600 dark:text-blue-400 transition-colors duration-200">
-              {{ averageVote }}
-            </p>
-          </div>
-          <div
-            v-if="medianVote !== null"
-            class="rounded-lg bg-green-50 dark:bg-green-900/30 p-3 transition-colors duration-200"
-          >
-            <p class="text-xs text-gray-600 dark:text-gray-300 transition-colors duration-200">
-              Median
-            </p>
-            <p class="text-lg font-bold text-green-600 dark:text-green-400 transition-colors duration-200">
-              {{ medianVote }}
-            </p>
-          </div>
-          <div
-            v-if="consensusPercentage !== null"
-            class="rounded-lg bg-purple-50 dark:bg-purple-900/30 p-3 transition-colors duration-200"
-          >
-            <p class="text-xs text-gray-600 dark:text-gray-300 transition-colors duration-200">
-              Consensus
-            </p>
-            <p class="text-lg font-bold text-purple-600 dark:text-purple-400 transition-colors duration-200">
-              {{ consensusPercentage }}%
-            </p>
-          </div>
-        </div>
-        <!-- Consensus indicator -->
-        <div
-          v-if="consensusPercentage !== null"
-          class="mt-2"
-        >
-          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 transition-colors duration-200">
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="{
-                'bg-red-500': consensusPercentage < 50,
-                'bg-yellow-500': consensusPercentage >= 50 && consensusPercentage < 75,
-                'bg-green-500': consensusPercentage >= 75
-              }"
-              :style="{ width: `${consensusPercentage}%` }"
-            ></div>
-          </div>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 transition-colors duration-200">
-            {{
-              consensusPercentage >= 75 ? 'Strong consensus!' :
-              consensusPercentage >= 50 ? 'Moderate agreement' :
-              'Low consensus - discuss?'
-            }}
-          </p>
-        </div>
       </div>
+
       <div
-        v-else-if="votingComplete"
-        class="text-sm text-green-600 dark:text-green-400 transition-colors duration-200"
+        class="grid grid-cols-3 justify-items-center gap-4 sm:grid-cols-5"
+        :class="{ 'opacity-50 pointer-events-none': !isJoined }"
+      >
+        <Card
+          v-for="cardValue in pokerDeck"
+          :key="cardValue"
+          :value="cardValue"
+          :selected="selectedValue === cardValue"
+          @select="handleSelect(cardValue)"
+        />
+      </div>
+
+      <div class="mt-8 text-center">
+        <p class="text-gray-600 dark:text-gray-300 transition-colors duration-200">
+          Your vote:
+        </p>
+        <p class="min-h-[48px] text-4xl font-bold text-blue-600 dark:text-blue-400 transition-colors duration-200">
+          {{ selectedValue ?? '...' }}
+        </p>
+        <!-- Vote changed indicator -->
+        <Transition
+          enter-active-class="transition ease-out duration-200"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition ease-in duration-150"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
+        >
+          <p
+            v-if="voteChanged"
+            class="mt-2 inline-block rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 text-sm font-medium text-yellow-800 dark:text-yellow-300 transition-colors duration-200"
+          >
+            Vote changed
+          </p>
+        </Transition>
+      </div>
+
+      <!-- Voting status -->
+      <div
+        v-if="isJoined && votingComplete"
+        class="mt-4 text-center text-sm text-green-600 dark:text-green-400 transition-colors duration-200"
       >
         <p>All votes are in! Ready to reveal.</p>
       </div>
-    </div>
+    </template>
   </div>
 </template>
