@@ -1,5 +1,14 @@
 # Code Style & Conventions
 
+## Linting & Formatting
+- **ESLint**: v9 flat config (eslint.config.mjs)
+- **Semicolons**: Required (always)
+- **Quotes**: Single quotes preferred
+- **Trailing commas**: Required in multiline
+- **Import sorting**: Enforced via perfectionist plugin
+- **Auto-fix on commit**: Husky + lint-staged runs `eslint --fix` on staged files
+- **CI**: GitHub Actions runs lint + tests on PRs and pushes to main
+
 ## TypeScript
 - All code is written in TypeScript
 - Type definitions for Cloudflare Workers are generated via `pnpm cf-typegen`

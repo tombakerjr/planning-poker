@@ -15,6 +15,7 @@ Production URL: https://planning-poker.tombaker.workers.dev
 - **Real-time**: Durable Objects with WebSocket Hibernation API
 - **Database**: Cloudflare D1 (configured for future persistence)
 - **Styling**: Tailwind CSS
+- **Linting**: ESLint v9 flat config with TypeScript, Vue, and stylistic rules
 - **Testing**: Vitest with @cloudflare/vitest-pool-workers
 - **Package Manager**: pnpm (v10.19.0)
 - **Node Version**: v22 (LTS)
@@ -70,6 +71,15 @@ pnpm test:e2e:debug
 
 # Run specific E2E test file
 pnpm test:e2e e2e/room-creation.spec.ts
+```
+
+### Linting
+```bash
+# Check all files for linting errors
+pnpm lint
+
+# Auto-fix linting and formatting issues
+pnpm lint:fix
 ```
 
 ### Type Generation

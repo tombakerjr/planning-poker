@@ -6,7 +6,9 @@
 
 ## Overview
 
-Add ESLint v9 with Nuxt's official configuration to provide linting and formatting for the planning-poker codebase. Includes git hooks for pre-commit linting and CI integration for automated checks.
+Add ESLint v9 with a standalone flat config to provide linting and formatting for the planning-poker codebase. Includes git hooks for pre-commit linting and CI integration for automated checks.
+
+**Note:** Originally planned to use @nuxt/eslint but pivoted to standalone config due to issues with the Nuxt module (dependency on generated files, missing TypeScript package, poor DX).
 
 ## Goals
 
@@ -30,18 +32,25 @@ Add ESLint v9 with Nuxt's official configuration to provide linting and formatti
 
 ### Configuration Baseline
 
-**@nuxt/eslint** was chosen over building from scratch because:
-- Maintained by the Nuxt team
-- Understands Nuxt conventions (auto-imports, Nitro routes)
-- Bundles Vue, TypeScript, and stylistic rules
-- Allows rule overrides for customization
+**Standalone flat config** was ultimately chosen because:
+- @nuxt/eslint required generated files in `.nuxt/` directory
+- TypeScript package wasn't automatically included
+- Perfectionist plugin wasn't included despite documentation
+- Standalone config works immediately after install, no Nuxt coupling
+
+**Plugins used:**
+- `typescript-eslint` - TypeScript parser and rules
+- `eslint-plugin-vue` - Vue template linting
+- `@stylistic/eslint-plugin` - Formatting (semi, quotes, comma-dangle)
+- `eslint-plugin-perfectionist` - Import sorting
 
 ### Code Style Preferences
 
 - **Semicolons:** Required (always)
 - **Quotes:** Single quotes preferred
 - **Trailing commas:** Required in multiline
-- **Import sorting:** Enforced via perfectionist plugin (included in @nuxt/eslint)
+- **Indentation:** 2 spaces
+- **Import sorting:** Enforced via perfectionist plugin
 
 ### Git Hooks
 
