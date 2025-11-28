@@ -1,3 +1,5 @@
+import { logger } from './logger';
+
 // Flag value types
 export interface FlagDefaults {
   APP_ENABLED: boolean
@@ -50,14 +52,14 @@ export class Config {
       const payloadJson = await this.env.FLAGS_CACHE.get(PAYLOAD_KEY, 'text');
 
       if (!payloadJson) {
-        console.warn('No payload found in KV, using defaults');
+        logger.warn('No payload found in KV, using defaults');
         return {};
       }
 
       const payload = JSON.parse(payloadJson) as { features: Record<string, any> };
 
       if (!payload?.features) {
-        console.warn('Invalid payload structure in KV, using defaults');
+        logger.warn('Invalid payload structure in KV, using defaults');
         return {};
       }
 
@@ -76,7 +78,7 @@ export class Config {
 
       return flags;
     } catch (error) {
-      console.error('Failed to read flags from KV:', error);
+      logger.error('Failed to read flags from KV', error);
       return {};
     }
   }

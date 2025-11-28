@@ -1,4 +1,5 @@
 import { createConfig } from '../utils/config';
+import { logger } from '../utils/logger';
 
 /**
  * Flags API endpoint
@@ -22,7 +23,7 @@ export default defineEventHandler(async (event) => {
       timestamp: Date.now(),
     };
   } catch (error) {
-    console.error('Error fetching flags:', error);
+    logger.error('Error fetching flags', error);
 
     // Return error but don't fail - client should use cached values
     return {
