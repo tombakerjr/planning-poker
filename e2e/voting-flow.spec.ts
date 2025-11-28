@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.describe('Voting Flow', () => {
   test('should complete a full voting round with single user', async ({ page }) => {

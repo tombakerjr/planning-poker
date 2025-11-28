@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { env, createExecutionContext } from 'cloudflare:test';
+import { createExecutionContext, env } from 'cloudflare:test';
+import { beforeEach, describe, expect, it } from 'vitest';
+
 import worker from '../../../worker';
 
 describe('POST /api/room/create', () => {
@@ -11,7 +12,7 @@ describe('POST /api/room/create', () => {
 
   it('should create a room and return a room ID', async () => {
     const request = new Request('http://localhost/api/room/create', {
-      method: 'POST'
+      method: 'POST',
     });
 
     const response = await worker.fetch(request, env, ctx);
@@ -30,7 +31,7 @@ describe('POST /api/room/create', () => {
     // Create 10 rooms
     for (let i = 0; i < 10; i++) {
       const request = new Request('http://localhost/api/room/create', {
-        method: 'POST'
+        method: 'POST',
       });
 
       const response = await worker.fetch(request, env, ctx);
@@ -52,8 +53,8 @@ describe('POST /api/room/create', () => {
       const request = new Request('http://localhost/api/room/create', {
         method: 'POST',
         headers: {
-          'cf-connecting-ip': ip
-        }
+          'cf-connecting-ip': ip,
+        },
       });
 
       requests.push(worker.fetch(request, env, ctx));
@@ -83,8 +84,8 @@ describe('POST /api/room/create', () => {
       const request = new Request('http://localhost/api/room/create', {
         method: 'POST',
         headers: {
-          'cf-connecting-ip': `10.0.${i}.1`
-        }
+          'cf-connecting-ip': `10.0.${i}.1`,
+        },
       });
 
       requests.push(worker.fetch(request, env, ctx));
@@ -99,7 +100,7 @@ describe('POST /api/room/create', () => {
 
   it('should handle requests without IP address', async () => {
     const request = new Request('http://localhost/api/room/create', {
-      method: 'POST'
+      method: 'POST',
       // No cf-connecting-ip or x-forwarded-for headers
     });
 
@@ -120,8 +121,8 @@ describe('POST /api/room/create', () => {
       const request = new Request('http://localhost/api/room/create', {
         method: 'POST',
         headers: {
-          'cf-connecting-ip': ip
-        }
+          'cf-connecting-ip': ip,
+        },
       });
 
       const response = await worker.fetch(request, env, ctx);
@@ -132,8 +133,8 @@ describe('POST /api/room/create', () => {
     const rateLimitedRequest = new Request('http://localhost/api/room/create', {
       method: 'POST',
       headers: {
-        'cf-connecting-ip': ip
-      }
+        'cf-connecting-ip': ip,
+      },
     });
 
     const rateLimitedResponse = await worker.fetch(rateLimitedRequest, env, ctx);

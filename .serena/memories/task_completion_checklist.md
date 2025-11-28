@@ -17,6 +17,11 @@ When completing a task or implementing a feature, follow this checklist:
 - [ ] Add E2E tests if needed: `pnpm test:e2e`
 - [ ] Check test coverage if relevant: `pnpm test:coverage`
 
+## 2.5 Linting
+- [ ] Run linter: `pnpm lint`
+- [ ] Fix any issues: `pnpm lint:fix`
+- [ ] Ensure no linting errors remain (warnings are acceptable)
+
 ## 3. Type Safety
 - [ ] Ensure TypeScript types are correct
 - [ ] Run type generation if needed: `pnpm cf-typegen`

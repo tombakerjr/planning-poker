@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { useColorMode } from '~/composables/useColorMode'
+import { useColorMode } from '~/composables/useColorMode';
 
-const { isDark, toggleColorMode } = useColorMode()
+const { isDark, toggleColorMode } = useColorMode();
 </script>
 
 <template>
   <button
-    @click="toggleColorMode"
     class="rounded-md p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
     :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
     aria-label="Toggle theme"
+    @click="toggleColorMode"
   >
     <!-- Sun icon for light mode (shown when dark) -->
     <svg

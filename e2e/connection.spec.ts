@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.describe('WebSocket Connection', () => {
   test('should establish WebSocket connection on room load', async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe('WebSocket Connection', () => {
     // Should briefly show "Connecting" or immediately "Connected"
     // We check for either state as it may connect very quickly
     await expect(
-      page.getByText(/Connected|Connecting/i)
+      page.getByText(/Connected|Connecting/i),
     ).toBeVisible({ timeout: 10000 });
   });
 

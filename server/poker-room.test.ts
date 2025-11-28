@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { env, createExecutionContext } from 'cloudflare:test';
+import { createExecutionContext, env } from 'cloudflare:test';
+import { beforeEach, describe, expect, it } from 'vitest';
+
 import { PokerRoom } from './poker-room';
 
 describe('PokerRoom Durable Object', () => {
@@ -16,7 +17,7 @@ describe('PokerRoom Durable Object', () => {
   describe('WebSocket Connection', () => {
     it('should handle WebSocket upgrade request', async () => {
       const request = new Request('https://example.com/ws', {
-        headers: { upgrade: 'websocket' }
+        headers: { upgrade: 'websocket' },
       });
 
       const response = await room.fetch(request);
@@ -55,7 +56,7 @@ describe('PokerRoom Durable Object', () => {
 
       // Create a WebSocket connection to ensure the room is initialized
       const request = new Request('https://example.com/ws', {
-        headers: { upgrade: 'websocket' }
+        headers: { upgrade: 'websocket' },
       });
       const response = await testRoom.fetch(request);
       expect(response.status).toBe(101);
@@ -75,7 +76,7 @@ describe('PokerRoom Durable Object', () => {
       const testRoom = env.POKER_ROOM.get(id);
 
       const request = new Request('https://example.com/ws', {
-        headers: { upgrade: 'websocket' }
+        headers: { upgrade: 'websocket' },
       });
       const response = await testRoom.fetch(request);
       expect(response.status).toBe(101);
@@ -93,7 +94,7 @@ describe('PokerRoom Durable Object', () => {
 
     it('should accept WebSocket connections for auto-reveal testing', async () => {
       const request = new Request('https://example.com/ws', {
-        headers: { upgrade: 'websocket' }
+        headers: { upgrade: 'websocket' },
       });
       const response = await room.fetch(request);
       expect(response.status).toBe(101);
@@ -111,10 +112,10 @@ describe('PokerRoom Durable Object', () => {
       const exampleState = {
         participants: {
           'user1': { name: 'Alice', vote: null },
-          'user2': { name: 'Bob', vote: null }
+          'user2': { name: 'Bob', vote: null },
         },
         autoReveal: true,
-        votesRevealed: false
+        votesRevealed: false,
       };
 
       // After user1 votes (but not all voted yet)
@@ -125,10 +126,10 @@ describe('PokerRoom Durable Object', () => {
       const afterAllVoted = {
         participants: {
           'user1': { name: 'Alice', vote: 5 },
-          'user2': { name: 'Bob', vote: 8 }
+          'user2': { name: 'Bob', vote: 8 },
         },
         autoReveal: true,
-        votesRevealed: true // Auto-revealed!
+        votesRevealed: true, // Auto-revealed!
       };
 
       expect(afterAllVoted.votesRevealed).toBe(true);
@@ -142,10 +143,10 @@ describe('PokerRoom Durable Object', () => {
       const stateWithAutoRevealOff = {
         participants: {
           'user1': { name: 'Alice', vote: 5 },
-          'user2': { name: 'Bob', vote: 8 }
+          'user2': { name: 'Bob', vote: 8 },
         },
         autoReveal: false,
-        votesRevealed: false
+        votesRevealed: false,
       };
 
       // All voted, but auto-reveal is off, so votes remain hidden
@@ -162,7 +163,7 @@ describe('PokerRoom Durable Object', () => {
         votesRevealed: false,
         storyTitle: '',
         votingScale: 'fibonacci',
-        autoReveal: false
+        autoReveal: false,
       };
 
       expect(storageSchema.autoReveal).toBe(false);
@@ -176,7 +177,7 @@ describe('PokerRoom Durable Object', () => {
 
     it('should accept WebSocket connections for scale testing', async () => {
       const request = new Request('https://example.com/ws', {
-        headers: { upgrade: 'websocket' }
+        headers: { upgrade: 'websocket' },
       });
       const response = await room.fetch(request);
       expect(response.status).toBe(101);
@@ -229,20 +230,20 @@ describe('PokerRoom Durable Object', () => {
       const exampleState = {
         participants: {
           'user1': { name: 'Alice', vote: 21 },
-          'user2': { name: 'Bob', vote: 13 }
+          'user2': { name: 'Bob', vote: 13 },
         },
         votingScale: 'fibonacci',
-        votesRevealed: true
+        votesRevealed: true,
       };
 
       // After scale change, expect:
       const expectedState = {
         participants: {
           'user1': { name: 'Alice', vote: null },
-          'user2': { name: 'Bob', vote: null }
+          'user2': { name: 'Bob', vote: null },
         },
         votingScale: 't-shirt',
-        votesRevealed: false
+        votesRevealed: false,
       };
 
       // Verify test data structure
@@ -263,7 +264,7 @@ describe('PokerRoom Durable Object', () => {
         participants: {},
         votesRevealed: false,
         storyTitle: '',
-        votingScale: 'fibonacci'
+        votingScale: 'fibonacci',
       };
 
       expect(storageSchema.votingScale).toBe('fibonacci');
@@ -287,12 +288,12 @@ describe('PokerRoom Durable Object', () => {
 
       const pingMessage = {
         type: 'ping',
-        id: 123
+        id: 123,
       };
 
       const expectedPongMessage = {
         type: 'pong',
-        id: 123
+        id: 123,
       };
 
       // Verify message structure
@@ -308,12 +309,12 @@ describe('PokerRoom Durable Object', () => {
       // See server/poker-room.ts:256 for implementation (id is optional)
 
       const oldPingMessage = {
-        type: 'ping'
+        type: 'ping',
         // No ID field
       };
 
       const expectedPongMessage = {
-        type: 'pong'
+        type: 'pong',
         // No ID field required
       };
 
@@ -330,7 +331,7 @@ describe('PokerRoom Durable Object', () => {
         { input: 0, expected: 0 },
         { input: 1, expected: 1 },
         { input: 999, expected: 999 },
-        { input: 2147483647, expected: 2147483647 } // Max safe int
+        { input: 2147483647, expected: 2147483647 }, // Max safe int
       ];
 
       testCases.forEach(({ input, expected }) => {
@@ -378,7 +379,7 @@ describe('PokerRoom Durable Object', () => {
             return rtt;
           }
           return null;
-        }
+        },
       };
 
       // Simulate workflow

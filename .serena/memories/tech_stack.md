@@ -13,6 +13,8 @@
 - **Package Manager**: pnpm (v10.19.0)
 - **Node Version**: v22 (LTS) - enforced via .nvmrc
 - **Language**: TypeScript
+- **Linting**: ESLint v9 flat config (typescript-eslint, eslint-plugin-vue, @stylistic/eslint-plugin)
+- **Git Hooks**: Husky v9 + lint-staged (runs ESLint on staged files)
 - **Testing**: Vitest (v3.2.4+) with @cloudflare/vitest-pool-workers
 - **E2E Testing**: Playwright (v1.56.1+)
 - **Build Tool**: Nitro with cloudflare_module preset

@@ -2,11 +2,11 @@
 defineProps<{
   value: string | number
   selected?: boolean
-}>()
+}>();
 
 defineEmits<{
   (e: 'select'): void
-}>()
+}>();
 </script>
 
 <template>

@@ -60,6 +60,15 @@ pnpm test:e2e e2e/room-creation.spec.ts --reporter=list
 pnpm cf-typegen
 ```
 
+## Linting
+```bash
+# Check all files for linting errors
+pnpm lint
+
+# Auto-fix linting and formatting issues
+pnpm lint:fix
+```
+
 ## Deployment
 ```bash
 # Deploy to Cloudflare Workers
