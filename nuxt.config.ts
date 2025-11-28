@@ -41,15 +41,5 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ['@nuxt/eslint', '@nuxtjs/tailwindcss'],
-
-  eslint: {
-    config: {
-      stylistic: {
-        semi: true,
-        quotes: 'single',
-        commaDangle: 'always-multiline',
-      },
-    },
-  },
+  modules: ['@nuxtjs/tailwindcss'],
 });
