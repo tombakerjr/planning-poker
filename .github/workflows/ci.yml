@@ -27,5 +27,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Create assets directory for tests
+        run: mkdir -p .output/public
+
       - name: Test
         run: pnpm test --run
