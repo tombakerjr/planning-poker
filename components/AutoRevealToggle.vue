@@ -1,14 +1,14 @@
 <script setup lang="ts">
 const props = defineProps<{
   autoReveal: boolean
-}>()
+}>();
 
 const emit = defineEmits<{
   (e: 'update:autoReveal', value: boolean): void
-}>()
+}>();
 
 function toggleAutoReveal() {
-  emit('update:autoReveal', !props.autoReveal)
+  emit('update:autoReveal', !props.autoReveal);
 }
 </script>
 
@@ -23,12 +23,12 @@ function toggleAutoReveal() {
       </p>
     </div>
     <button
-      @click="toggleAutoReveal"
       type="button"
       role="switch"
       :aria-checked="autoReveal"
       class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
       :class="autoReveal ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'"
+      @click="toggleAutoReveal"
     >
       <span class="sr-only">Toggle auto-reveal</span>
       <span

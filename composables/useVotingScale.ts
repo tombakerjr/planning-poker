@@ -1,6 +1,6 @@
-import { computed, type ComputedRef } from 'vue'
+import { computed, type ComputedRef } from 'vue';
 
-export type VotingScaleType = 'fibonacci' | 'modified-fibonacci' | 't-shirt' | 'powers-of-2' | 'linear' | 'custom'
+export type VotingScaleType = 'fibonacci' | 'modified-fibonacci' | 't-shirt' | 'powers-of-2' | 'linear' | 'custom';
 
 export interface VotingScale {
   id: VotingScaleType
@@ -47,10 +47,10 @@ export const VOTING_SCALES: Record<VotingScaleType, VotingScale> = {
     description: 'User-defined values',
     values: [], // Will be populated by user
   },
-}
+};
 
 // Get all available scales (excluding custom until fully implemented)
-export const AVAILABLE_SCALES = Object.values(VOTING_SCALES).filter(scale => scale.id !== 'custom')
+export const AVAILABLE_SCALES = Object.values(VOTING_SCALES).filter(scale => scale.id !== 'custom');
 
 /**
  * Utility composable for voting scales - no state management, just utilities
@@ -60,24 +60,24 @@ export const AVAILABLE_SCALES = Object.values(VOTING_SCALES).filter(scale => sca
 export function useVotingScale(scaleId?: ComputedRef<string | undefined> | string) {
   // Get scale by ID, defaulting to fibonacci
   const getScale = (id: string | undefined): VotingScale => {
-    const scaleType = (id || 'fibonacci') as VotingScaleType
-    return VOTING_SCALES[scaleType] || VOTING_SCALES['fibonacci']
-  }
+    const scaleType = (id || 'fibonacci') as VotingScaleType;
+    return VOTING_SCALES[scaleType] || VOTING_SCALES['fibonacci'];
+  };
 
   // If scaleId is provided, return a computed scale
   const currentScale = computed(() => {
     if (typeof scaleId === 'string') {
-      return getScale(scaleId)
+      return getScale(scaleId);
     } else if (scaleId) {
-      return getScale(scaleId.value)
+      return getScale(scaleId.value);
     }
-    return VOTING_SCALES['fibonacci']
-  })
+    return VOTING_SCALES['fibonacci'];
+  });
 
   return {
     currentScale,
     availableScales: AVAILABLE_SCALES,
     getScale,
     VOTING_SCALES,
-  }
+  };
 }

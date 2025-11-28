@@ -1,4 +1,4 @@
-import { createConfig } from '../utils/config'
+import { createConfig } from '../utils/config';
 
 /**
  * Flags API endpoint
@@ -10,27 +10,27 @@ import { createConfig } from '../utils/config'
  * No network requests to GrowthBook at runtime - instant updates via webhook.
  */
 export default defineEventHandler(async (event) => {
-  const env = event.context.cloudflare.env as Env
-  const config = createConfig(env)
+  const env = event.context.cloudflare.env as Env;
+  const config = createConfig(env);
 
   try {
-    const flags = await config.getAll()
+    const flags = await config.getAll();
 
     return {
       success: true,
       flags,
       timestamp: Date.now(),
-    }
+    };
   } catch (error) {
-    console.error('Error fetching flags:', error)
+    console.error('Error fetching flags:', error);
 
     // Return error but don't fail - client should use cached values
     return {
       success: false,
       error: 'Failed to fetch flags',
       timestamp: Date.now(),
-    }
+    };
   } finally {
-    config.destroy()
+    config.destroy();
   }
-})
+});

@@ -8,37 +8,37 @@ interface Emits {
   (e: 'close'): void
 }
 
-defineProps<Props>()
-const emit = defineEmits<Emits>()
+defineProps<Props>();
+const emit = defineEmits<Emits>();
 
-const name = ref('')
-const isSubmitting = ref(false)
+const name = ref('');
+const isSubmitting = ref(false);
 
 const handleSubmit = () => {
-  const trimmedName = name.value.trim()
-  if (!trimmedName) return
+  const trimmedName = name.value.trim();
+  if (!trimmedName) return;
 
-  isSubmitting.value = true
-  emit('join', trimmedName)
+  isSubmitting.value = true;
+  emit('join', trimmedName);
   
   // Reset form
-  name.value = ''
-  isSubmitting.value = false
-}
+  name.value = '';
+  isSubmitting.value = false;
+};
 
 const handleClose = () => {
-  name.value = ''
-  emit('close')
-}
+  name.value = '';
+  emit('close');
+};
 
 // Generate a random guest name if empty
 const generateGuestName = () => {
-  const adjectives = ['Swift', 'Clever', 'Bright', 'Bold', 'Quick', 'Sharp']
-  const animals = ['Fox', 'Eagle', 'Wolf', 'Hawk', 'Lion', 'Bear']
-  const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
-  const animal = animals[Math.floor(Math.random() * animals.length)]
-  name.value = `${adj}${animal}${Math.floor(Math.random() * 100)}`
-}
+  const adjectives = ['Swift', 'Clever', 'Bright', 'Bold', 'Quick', 'Sharp'];
+  const animals = ['Fox', 'Eagle', 'Wolf', 'Hawk', 'Lion', 'Bear'];
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const animal = animals[Math.floor(Math.random() * animals.length)];
+  name.value = `${adj}${animal}${Math.floor(Math.random() * 100)}`;
+};
 </script>
 
 <template>
@@ -68,15 +68,15 @@ const generateGuestName = () => {
             class="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
             :disabled="isSubmitting"
             required
-          >
+          />
         </div>
 
         <div class="mb-6">
           <button
             type="button"
-            @click="generateGuestName"
             class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200"
             :disabled="isSubmitting"
+            @click="generateGuestName"
           >
             Generate random name
           </button>
@@ -85,9 +85,9 @@ const generateGuestName = () => {
         <div class="flex gap-3">
           <button
             type="button"
-            @click="handleClose"
             class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
             :disabled="isSubmitting"
+            @click="handleClose"
           >
             Cancel
           </button>

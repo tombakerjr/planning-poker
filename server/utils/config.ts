@@ -20,10 +20,10 @@ const DEFAULTS: FlagDefaults = {
   MAX_MESSAGES_PER_SECOND: 10,
   RATE_LIMIT_WINDOW_MS: 1000,
   LOG_LEVEL: 'WARN',
-}
+};
 
 // KV key where GrowthBook webhook stores the payload
-const PAYLOAD_KEY = 'gb_payload'
+const PAYLOAD_KEY = 'gb_payload';
 
 /**
  * Config service for feature flags with GrowthBook
@@ -34,8 +34,8 @@ const PAYLOAD_KEY = 'gb_payload'
  * 3. Fall back to hardcoded defaults if KV read fails
  */
 export class Config {
-  private flags: Partial<FlagDefaults> | null = null
-  private flagsPromise: Promise<Partial<FlagDefaults>> | null = null
+  private flags: Partial<FlagDefaults> | null = null;
+  private flagsPromise: Promise<Partial<FlagDefaults>> | null = null;
 
   constructor(
     private env: Env,
@@ -47,21 +47,21 @@ export class Config {
   private async fetchFlags(): Promise<Partial<FlagDefaults>> {
     try {
       // Read payload directly from KV (pushed by GrowthBook webhook)
-      const payloadJson = await this.env.FLAGS_CACHE.get(PAYLOAD_KEY, 'text')
+      const payloadJson = await this.env.FLAGS_CACHE.get(PAYLOAD_KEY, 'text');
 
       if (!payloadJson) {
-        console.warn('No payload found in KV, using defaults')
-        return {}
+        console.warn('No payload found in KV, using defaults');
+        return {};
       }
 
-      const payload = JSON.parse(payloadJson) as { features: Record<string, any> }
+      const payload = JSON.parse(payloadJson) as { features: Record<string, any> };
 
       if (!payload?.features) {
-        console.warn('Invalid payload structure in KV, using defaults')
-        return {}
+        console.warn('Invalid payload structure in KV, using defaults');
+        return {};
       }
 
-      const features = payload.features
+      const features = payload.features;
 
       const flags: Partial<FlagDefaults> = {
         APP_ENABLED: features.APP_ENABLED?.defaultValue ?? DEFAULTS.APP_ENABLED,
@@ -72,12 +72,12 @@ export class Config {
         MAX_MESSAGES_PER_SECOND: features.MAX_MESSAGES_PER_SECOND?.defaultValue ?? DEFAULTS.MAX_MESSAGES_PER_SECOND,
         RATE_LIMIT_WINDOW_MS: features.RATE_LIMIT_WINDOW_MS?.defaultValue ?? DEFAULTS.RATE_LIMIT_WINDOW_MS,
         LOG_LEVEL: features.LOG_LEVEL?.defaultValue ?? DEFAULTS.LOG_LEVEL,
-      }
+      };
 
-      return flags
+      return flags;
     } catch (error) {
-      console.error('Failed to read flags from KV:', error)
-      return {}
+      console.error('Failed to read flags from KV:', error);
+      return {};
     }
   }
 
@@ -86,38 +86,38 @@ export class Config {
    */
   private async ensureFlags(): Promise<Partial<FlagDefaults>> {
     if (this.flags) {
-      return this.flags
+      return this.flags;
     }
 
     // Use Promise memoization: concurrent calls wait on the same Promise
     if (!this.flagsPromise) {
       this.flagsPromise = this.fetchFlags().then(flags => {
-        this.flags = flags
-        return flags
-      })
+        this.flags = flags;
+        return flags;
+      });
     }
 
-    return this.flagsPromise
+    return this.flagsPromise;
   }
 
   /**
    * Get a feature flag value by key
    */
   async get<K extends keyof FlagDefaults>(key: K): Promise<FlagDefaults[K]> {
-    const flags = await this.ensureFlags()
-    const value = flags[key]
-    return value !== undefined ? value : DEFAULTS[key]
+    const flags = await this.ensureFlags();
+    const value = flags[key];
+    return value !== undefined ? value : DEFAULTS[key];
   }
 
   /**
    * Get all flags as an object
    */
   async getAll(): Promise<FlagDefaults> {
-    const flags = await this.ensureFlags()
+    const flags = await this.ensureFlags();
     return {
       ...DEFAULTS,
       ...flags,
-    }
+    };
   }
 
   /**
@@ -132,5 +132,5 @@ export class Config {
  * Create a new Config instance
  */
 export function createConfig(env: Env): Config {
-  return new Config(env)
+  return new Config(env);
 }

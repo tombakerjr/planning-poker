@@ -1,5 +1,6 @@
-import { DurableObject } from "cloudflare:workers";
-import { createConfig } from './utils/config'
+import { DurableObject } from 'cloudflare:workers';
+
+import { createConfig } from './utils/config';
 
 // Simple logging utility for Durable Objects
 enum LogLevel {
@@ -82,51 +83,51 @@ interface RoomStorage {
 }
 
 interface AuthMessage {
-  type: "auth";
+  type: 'auth';
   userId: string;
 }
 
 interface JoinMessage {
-  type: "join";
+  type: 'join';
   name: string;
 }
 
 interface VoteMessage {
-  type: "vote";
+  type: 'vote';
   vote: string | number | null;
 }
 
 interface RevealMessage {
-  type: "reveal";
+  type: 'reveal';
 }
 
 interface ResetMessage {
-  type: "reset";
+  type: 'reset';
 }
 
 interface PingMessage {
-  type: "ping";
+  type: 'ping';
   id?: number;  // Optional for backward compatibility
 }
 
 interface PongMessage {
-  type: "pong";
+  type: 'pong';
   id?: number;  // Optional for backward compatibility
   maintenance?: boolean;  // True when app is in maintenance mode
 }
 
 interface SetStoryMessage {
-  type: "setStory";
+  type: 'setStory';
   title: string;
 }
 
 interface SetScaleMessage {
-  type: "setScale";
+  type: 'setScale';
   scale: string;
 }
 
 interface SetAutoRevealMessage {
-  type: "setAutoReveal";
+  type: 'setAutoReveal';
   autoReveal: boolean;
 }
 
@@ -217,18 +218,18 @@ export class PokerRoom extends DurableObject {
     await this.loadConfig();
 
     // Handle WebSocket upgrade requests
-    if (request.headers.get("upgrade") === "websocket") {
+    if (request.headers.get('upgrade') === 'websocket') {
       return this.handleWebSocketUpgrade(request);
     }
 
-    return new Response("Expected WebSocket upgrade", { status: 426 });
+    return new Response('Expected WebSocket upgrade', { status: 426 });
   }
 
   private async handleWebSocketUpgrade(_request: Request): Promise<Response> {
     // Check connection limit
     const currentConnections = this.ctx.getWebSockets().length;
     if (currentConnections >= this.MAX_CONNECTIONS_PER_DO) {
-      return new Response("Too many connections", { status: 429 });
+      return new Response('Too many connections', { status: 429 });
     }
 
     // Create WebSocket pair
@@ -236,7 +237,7 @@ export class PokerRoom extends DurableObject {
     const [client, server] = Object.values(webSocketPair);
 
     if (!client || !server) {
-      return new Response("Failed to create WebSocket pair", { status: 500 });
+      return new Response('Failed to create WebSocket pair', { status: 500 });
     }
 
     // Accept the WebSocket using Hibernation API
@@ -256,8 +257,8 @@ export class PokerRoom extends DurableObject {
     // Check rate limit
     if (!this.checkRateLimit(ws)) {
       ws.send(JSON.stringify({
-        type: "error",
-        payload: { message: "Rate limit exceeded. Please slow down." }
+        type: 'error',
+        payload: { message: 'Rate limit exceeded. Please slow down.' },
       }));
       return;
     }
@@ -272,15 +273,15 @@ export class PokerRoom extends DurableObject {
     }
 
     // Validate message type and size
-    if (typeof message !== "string") {
+    if (typeof message !== 'string') {
       logger.warn(`Invalid message type: ${typeof message}`);
-      ws.close(1003, "Invalid message type");
+      ws.close(1003, 'Invalid message type');
       return;
     }
 
     if (message.length > this.MAX_MESSAGE_SIZE) {
       logger.warn(`Message too large: ${message.length} bytes`);
-      ws.close(1009, "Message too large");
+      ws.close(1009, 'Message too large');
       return;
     }
 
@@ -288,7 +289,7 @@ export class PokerRoom extends DurableObject {
       const parsed = JSON.parse(message) as WebSocketMessage;
 
       // Handle authentication message
-      if (parsed.type === "auth") {
+      if (parsed.type === 'auth') {
         const meta: WebSocketMeta = {
           userId: parsed.userId,
         };
@@ -305,19 +306,19 @@ export class PokerRoom extends DurableObject {
       // For other messages, get userId from metadata
       const meta = this.sessions.get(ws);
       if (!meta) {
-        logger.warn("WebSocket not authenticated");
-        ws.close(1003, "Not authenticated");
+        logger.warn('WebSocket not authenticated');
+        ws.close(1003, 'Not authenticated');
         return;
       }
 
       // Handle ping/pong for heartbeat
-      if (parsed.type === "ping") {
+      if (parsed.type === 'ping') {
         // Echo back the ping ID for latency measurement (backward compatible)
         // Include maintenance flag so clients can show maintenance UI
         const pong: PongMessage = {
-          type: "pong",
+          type: 'pong',
           id: parsed.id,
-          maintenance: !this.APP_ENABLED
+          maintenance: !this.APP_ENABLED,
         };
         ws.send(JSON.stringify(pong));
         return;
@@ -326,8 +327,8 @@ export class PokerRoom extends DurableObject {
       // Handle room messages
       await this.handleMessage(ws, meta.userId, parsed);
     } catch (err) {
-      logger.error("Message processing error:", err);
-      ws.close(1003, "Invalid message format");
+      logger.error('Message processing error:', err);
+      ws.close(1003, 'Invalid message format');
     }
   }
 
@@ -335,7 +336,7 @@ export class PokerRoom extends DurableObject {
     ws: WebSocket,
     _code: number,
     _reason: string,
-    _wasClean: boolean
+    _wasClean: boolean,
   ) {
     // Stop heartbeat to prevent memory leak
     this.stopHeartbeat(ws);
@@ -365,7 +366,7 @@ export class PokerRoom extends DurableObject {
   }
 
   override async webSocketError(ws: WebSocket, error: unknown) {
-    logger.error("WebSocket error:", error);
+    logger.error('WebSocket error:', error);
     const meta = this.sessions.get(ws);
     if (meta) {
       this.sessions.delete(ws);
@@ -376,7 +377,7 @@ export class PokerRoom extends DurableObject {
     const roomState = await this.getRoomState();
 
     switch (message.type) {
-      case "join": {
+      case 'join': {
         // Add a new participant to the room
         const sanitizedName = message.name?.trim().substring(0, MAX_NAME_LENGTH);
         roomState.participants[userId] = {
@@ -385,12 +386,12 @@ export class PokerRoom extends DurableObject {
         };
         break;
       }
-      case "vote": {
+      case 'vote': {
         // Validate user has joined before voting
         if (!roomState.participants[userId]) {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Must join room before voting" }
+            type: 'error',
+            payload: { message: 'Must join room before voting' },
           }));
           return;
         }
@@ -407,8 +408,8 @@ export class PokerRoom extends DurableObject {
 
           if (!validValuesStr.includes(voteStr)) {
             ws.send(JSON.stringify({
-              type: "error",
-              payload: { message: "Invalid vote value for current scale. The scale may have changed - please vote again." }
+              type: 'error',
+              payload: { message: 'Invalid vote value for current scale. The scale may have changed - please vote again.' },
             }));
             return;
           }
@@ -434,7 +435,7 @@ export class PokerRoom extends DurableObject {
           // Schedule auto-reveal with delay to prevent race where last voter doesn't see their vote
           this.autoRevealTimeout = setTimeout(() => {
             this.tryAutoReveal().catch(err => {
-              logger.error("Auto-reveal failed:", err);
+              logger.error('Auto-reveal failed:', err);
             });
             this.autoRevealTimeout = undefined;
           }, this.AUTO_REVEAL_DELAY_MS) as unknown as number;
@@ -443,12 +444,12 @@ export class PokerRoom extends DurableObject {
         // Early return since we've already persisted and broadcasted
         return;
       }
-      case "reveal": {
+      case 'reveal': {
         // Validate user has joined before revealing
         if (!roomState.participants[userId]) {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Must join room before revealing votes" }
+            type: 'error',
+            payload: { message: 'Must join room before revealing votes' },
           }));
           return;
         }
@@ -462,12 +463,12 @@ export class PokerRoom extends DurableObject {
         roomState.votesRevealed = true;
         break;
       }
-      case "reset": {
+      case 'reset': {
         // Validate user has joined before resetting
         if (!roomState.participants[userId]) {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Must join room before resetting" }
+            type: 'error',
+            payload: { message: 'Must join room before resetting' },
           }));
           return;
         }
@@ -487,26 +488,26 @@ export class PokerRoom extends DurableObject {
         }
         break;
       }
-      case "setStory": {
+      case 'setStory': {
         // Validate user has joined before setting story
         if (!roomState.participants[userId]) {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Must join room before setting story" }
+            type: 'error',
+            payload: { message: 'Must join room before setting story' },
           }));
           return;
         }
         // Sanitize and limit story title length
         const sanitizedTitle = message.title?.trim().substring(0, 200);
-        roomState.storyTitle = sanitizedTitle || "";
+        roomState.storyTitle = sanitizedTitle || '';
         break;
       }
-      case "setScale": {
+      case 'setScale': {
         // Validate user has joined before setting scale
         if (!roomState.participants[userId]) {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Must join room before setting voting scale" }
+            type: 'error',
+            payload: { message: 'Must join room before setting voting scale' },
           }));
           return;
         }
@@ -514,8 +515,8 @@ export class PokerRoom extends DurableObject {
         // Validate scale type against whitelist
         if (!VALID_SCALES.includes(message.scale as ValidScale)) {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Invalid voting scale type" }
+            type: 'error',
+            payload: { message: 'Invalid voting scale type' },
           }));
           return;
         }
@@ -542,12 +543,12 @@ export class PokerRoom extends DurableObject {
         roomState.votesRevealed = false;
         break;
       }
-      case "setAutoReveal": {
+      case 'setAutoReveal': {
         // Validate user has joined before setting auto-reveal
         if (!roomState.participants[userId]) {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Must join room before changing auto-reveal setting" }
+            type: 'error',
+            payload: { message: 'Must join room before changing auto-reveal setting' },
           }));
           return;
         }
@@ -555,8 +556,8 @@ export class PokerRoom extends DurableObject {
         // Validate autoReveal is a boolean
         if (typeof message.autoReveal !== 'boolean') {
           ws.send(JSON.stringify({
-            type: "error",
-            payload: { message: "Invalid auto-reveal value" }
+            type: 'error',
+            payload: { message: 'Invalid auto-reveal value' },
           }));
           return;
         }
@@ -594,11 +595,11 @@ export class PokerRoom extends DurableObject {
 
   private serializeRoomState(roomState: RoomStorage) {
     return {
-      type: "update",
+      type: 'update',
       payload: {
         ...roomState,
         participants: Object.entries(roomState.participants).map(
-          ([id, p]) => ({ id, ...p })
+          ([id, p]) => ({ id, ...p }),
         ),
       },
     };
@@ -611,7 +612,7 @@ export class PokerRoom extends DurableObject {
     try {
       ws.send(JSON.stringify(message));
     } catch (error) {
-      logger.error("Failed to send room state:", error);
+      logger.error('Failed to send room state:', error);
     }
   }
 
@@ -627,7 +628,7 @@ export class PokerRoom extends DurableObject {
       try {
         ws.send(serializedMessage);
       } catch (error) {
-        logger.error("Failed to send message to WebSocket:", error);
+        logger.error('Failed to send message to WebSocket:', error);
       }
     }
   }
@@ -643,12 +644,12 @@ export class PokerRoom extends DurableObject {
   }
 
   private async getRoomState(): Promise<RoomStorage> {
-    const state: RoomStorage | undefined = await this.ctx.storage.get("state");
+    const state: RoomStorage | undefined = await this.ctx.storage.get('state');
     return state || {
       participants: {},
       votesRevealed: false,
-      storyTitle: "",
-      votingScale: "fibonacci",
+      storyTitle: '',
+      votingScale: 'fibonacci',
       autoReveal: false,
     };
   }
@@ -665,7 +666,7 @@ export class PokerRoom extends DurableObject {
   }
 
   private async setRoomState(state: RoomStorage) {
-    await this.ctx.storage.put("state", state);
+    await this.ctx.storage.put('state', state);
   }
 
   /**
@@ -677,7 +678,7 @@ export class PokerRoom extends DurableObject {
     // Use transaction to atomically read-check-write
     await this.ctx.storage.transaction(async (txn) => {
       // Read current state within transaction
-      const state = await txn.get<RoomStorage>("state");
+      const state = await txn.get<RoomStorage>('state');
 
       if (!state) return;
 
@@ -688,7 +689,7 @@ export class PokerRoom extends DurableObject {
 
       // Modify and write back atomically within transaction
       state.votesRevealed = true;
-      await txn.put("state", state);
+      await txn.put('state', state);
     });
 
     // Broadcast after transaction completes
@@ -702,9 +703,9 @@ export class PokerRoom extends DurableObject {
     // Send ping to keep connection alive
     const intervalId = setInterval(() => {
       try {
-        ws.send(JSON.stringify({ type: "ping" }));
+        ws.send(JSON.stringify({ type: 'ping' }));
       } catch (error) {
-        logger.error("Failed to send ping:", error);
+        logger.error('Failed to send ping:', error);
         this.stopHeartbeat(ws);
       }
     }, this.HEARTBEAT_INTERVAL_MS) as unknown as number;
@@ -728,7 +729,7 @@ export class PokerRoom extends DurableObject {
       // First message, initialize rate limit tracking
       this.rateLimits.set(ws, {
         messageCount: 1,
-        windowStart: now
+        windowStart: now,
       });
       return true;
     }

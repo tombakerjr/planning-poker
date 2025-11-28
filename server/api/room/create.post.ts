@@ -1,5 +1,6 @@
-import { nanoid } from 'nanoid'
-import { logger } from '~/server/utils/logger'
+import { nanoid } from 'nanoid';
+
+import { logger } from '~/server/utils/logger';
 
 const MAX_ROOMS_PER_MINUTE = 5;
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
@@ -64,19 +65,19 @@ export default defineEventHandler(async (event) => {
     if (!checkRateLimit(effectiveIp)) {
       throw createError({
         statusCode: 429,
-        statusMessage: 'Too many room creation requests. Please try again later.'
+        statusMessage: 'Too many room creation requests. Please try again later.',
       });
     }
 
     // Generate a unique room ID
-    const roomId = nanoid(10) // 10 character room ID
+    const roomId = nanoid(10); // 10 character room ID
 
     // Return the room ID
     return {
-      roomId
-    }
+      roomId,
+    };
   } catch (error) {
-    logger.error('Error creating room:', error)
+    logger.error('Error creating room:', error);
 
     // Re-throw if it's already a createError
     if (error && typeof error === 'object' && 'statusCode' in error) {
@@ -85,7 +86,7 @@ export default defineEventHandler(async (event) => {
 
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to create room'
-    })
+      statusMessage: 'Failed to create room',
+    });
   }
-})
+});

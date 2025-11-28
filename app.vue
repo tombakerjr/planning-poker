@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { useColorMode } from '~/composables/useColorMode'
+import { useColorMode } from '~/composables/useColorMode';
 
 // Initialize color mode on app mount (needed for side effects)
-useColorMode()
+useColorMode();
 
 // Global maintenance mode state (set by usePokerRoom when server reports maintenance)
-const maintenance = useState('maintenance-mode', () => false)
+const maintenance = useState('maintenance-mode', () => false);
 </script>
 
 <template>
@@ -18,8 +18,12 @@ const maintenance = useState('maintenance-mode', () => false)
           class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/95 backdrop-blur-sm"
         >
           <div class="text-center p-8 max-w-md">
-            <div class="text-6xl mb-6">🔧</div>
-            <h1 class="text-3xl font-bold text-white mb-4">Under Maintenance</h1>
+            <div class="text-6xl mb-6">
+              🔧
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-4">
+              Under Maintenance
+            </h1>
             <p class="text-gray-300 mb-2">
               Planning Poker is temporarily unavailable for scheduled maintenance.
             </p>

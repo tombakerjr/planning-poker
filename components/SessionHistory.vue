@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useSessionStorage } from '~/composables/useSessionStorage'
+import { useSessionStorage } from '~/composables/useSessionStorage';
 
 const {
   sortedSessionHistory,
@@ -7,10 +7,10 @@ const {
   removeSessionFromHistory,
   clearSessionHistory,
   downloadExport,
-} = useSessionStorage()
+} = useSessionStorage();
 
-const isExpanded = ref(false)
-const showExportMenu = ref(false)
+const isExpanded = ref(false);
+const showExportMenu = ref(false);
 
 // Format date for display
 function formatDate(timestamp: number): string {
@@ -19,58 +19,61 @@ function formatDate(timestamp: number): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  })
+  });
 }
 
 // Format duration
 function formatDuration(joinedAt: number, leftAt: number | null): string {
-  if (!leftAt) return 'In progress'
-  const minutes = Math.round((leftAt - joinedAt) / 60000)
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  const remainingMinutes = minutes % 60
-  return `${hours}h ${remainingMinutes}m`
+  if (!leftAt) return 'In progress';
+  const minutes = Math.round((leftAt - joinedAt) / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 function handleExport(format: 'json' | 'csv') {
-  downloadExport(format)
-  showExportMenu.value = false
+  downloadExport(format);
+  showExportMenu.value = false;
 }
 
 function handleRemove(roomId: string, joinedAt: number, event: Event) {
-  event.stopPropagation()
-  removeSessionFromHistory(roomId, joinedAt)
+  event.stopPropagation();
+  removeSessionFromHistory(roomId, joinedAt);
 }
 
 // Close export menu when clicking outside
 function handleClickOutside(event: MouseEvent) {
-  const target = event.target as HTMLElement
+  const target = event.target as HTMLElement;
   if (!target.closest('.export-menu-container')) {
-    showExportMenu.value = false
+    showExportMenu.value = false;
   }
 }
 
 onMounted(() => {
   // SSR guard: document is only available client-side
   if (typeof document !== 'undefined') {
-    document.addEventListener('click', handleClickOutside)
+    document.addEventListener('click', handleClickOutside);
   }
-})
+});
 
 onUnmounted(() => {
   // SSR guard: ensure cleanup matches mount
   if (typeof document !== 'undefined') {
-    document.removeEventListener('click', handleClickOutside)
+    document.removeEventListener('click', handleClickOutside);
   }
-})
+});
 </script>
 
 <template>
-  <div v-if="sortedSessionHistory.length > 0" class="w-full mt-6">
+  <div
+    v-if="sortedSessionHistory.length > 0"
+    class="w-full mt-6"
+  >
     <!-- Header with toggle -->
     <button
-      @click="isExpanded = !isExpanded"
       class="w-full flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+      @click="isExpanded = !isExpanded"
     >
       <div class="flex items-center gap-2">
         <svg
@@ -80,7 +83,12 @@ onUnmounted(() => {
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 5l7 7-7 7"
+          />
         </svg>
         <span class="font-semibold text-gray-800 dark:text-white transition-colors duration-200">
           Session History
@@ -91,7 +99,10 @@ onUnmounted(() => {
       </div>
 
       <!-- Stats preview when collapsed -->
-      <div v-if="!isExpanded" class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+      <div
+        v-if="!isExpanded"
+        class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400"
+      >
         <span>{{ sessionStats.totalRounds }} rounds</span>
         <span>{{ sessionStats.avgParticipants }} avg participants</span>
       </div>
@@ -106,18 +117,31 @@ onUnmounted(() => {
       leave-from-class="opacity-100 max-h-[500px]"
       leave-to-class="opacity-0 max-h-0"
     >
-      <div v-if="isExpanded" class="mt-2 overflow-hidden">
+      <div
+        v-if="isExpanded"
+        class="mt-2 overflow-hidden"
+      >
         <!-- Action buttons -->
         <div class="flex items-center justify-between mb-3 px-1">
           <div class="flex items-center gap-2">
             <!-- Export dropdown -->
             <div class="relative export-menu-container">
               <button
-                @click.stop="showExportMenu = !showExportMenu"
                 class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
+                @click.stop="showExportMenu = !showExportMenu"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
                 </svg>
                 Export
               </button>
@@ -136,14 +160,14 @@ onUnmounted(() => {
                   class="absolute left-0 mt-1 w-32 rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 z-10"
                 >
                   <button
-                    @click="handleExport('json')"
                     class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-md"
+                    @click="handleExport('json')"
                   >
                     Export as JSON
                   </button>
                   <button
-                    @click="handleExport('csv')"
                     class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-md"
+                    @click="handleExport('csv')"
                   >
                     Export as CSV
                   </button>
@@ -153,8 +177,8 @@ onUnmounted(() => {
           </div>
 
           <button
-            @click="clearSessionHistory"
             class="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            @click="clearSessionHistory"
           >
             Clear all
           </button>
@@ -185,12 +209,22 @@ onUnmounted(() => {
             </div>
 
             <button
-              @click="handleRemove(session.roomId, session.joinedAt, $event)"
               class="p-1 rounded-full text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
               title="Remove from history"
+              @click="handleRemove(session.roomId, session.joinedAt, $event)"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>

@@ -1,7 +1,7 @@
 // Custom worker entrypoint that exports both the default export and Durable Objects
-import * as nitroApp from './.output/server/index.mjs'
-import { createConfig } from './server/utils/config'
-export { PokerRoom } from './server/poker-room'
+import * as nitroApp from './.output/server/index.mjs';
+import { createConfig } from './server/utils/config';
+export { PokerRoom } from './server/poker-room';
 
 interface Env {
   POKER_ROOM: DurableObjectNamespace
@@ -10,25 +10,25 @@ interface Env {
 }
 
 // Module-level cache for kill switch to avoid KV reads on every request
-let killSwitchCache: { enabled: boolean; expiry: number } | null = null
-const KILL_SWITCH_CACHE_TTL = 60000 // 60 seconds
+let killSwitchCache: { enabled: boolean; expiry: number } | null = null;
+const KILL_SWITCH_CACHE_TTL = 60000; // 60 seconds
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // MASTER KILL SWITCH: Check APP_ENABLED flag before routing
     // Returns maintenance page when APP_ENABLED is false
-    const now = Date.now()
+    const now = Date.now();
 
     // Check cache first to avoid KV reads on every request
     if (!killSwitchCache || now > killSwitchCache.expiry) {
-      const config = createConfig(env)
-      const appEnabled = await config.get('APP_ENABLED')
-      config.destroy()
+      const config = createConfig(env);
+      const appEnabled = await config.get('APP_ENABLED');
+      config.destroy();
 
       killSwitchCache = {
         enabled: appEnabled,
-        expiry: now + KILL_SWITCH_CACHE_TTL
-      }
+        expiry: now + KILL_SWITCH_CACHE_TTL,
+      };
     }
 
     if (!killSwitchCache.enabled) {
@@ -73,26 +73,26 @@ export default {
             'Content-Type': 'text/html; charset=utf-8',
             'Retry-After': '300', // Suggest retry in 5 minutes
           },
-        }
-      )
+        },
+      );
     }
 
     // Check if this is a WebSocket upgrade request for a room
-    const url = new URL(request.url)
-    const wsMatch = url.pathname.match(/^\/api\/room\/([^\/]+)\/ws$/)
+    const url = new URL(request.url);
+    const wsMatch = url.pathname.match(/^\/api\/room\/([^\/]+)\/ws$/);
 
     if (wsMatch && request.headers.get('Upgrade') === 'websocket') {
-      const roomId = wsMatch[1]
+      const roomId = wsMatch[1];
 
       // Get the Durable Object instance for this room
-      const id = env.POKER_ROOM.idFromName(roomId)
-      const stub = env.POKER_ROOM.get(id)
+      const id = env.POKER_ROOM.idFromName(roomId);
+      const stub = env.POKER_ROOM.get(id);
 
       // Forward the WebSocket upgrade request to the Durable Object
-      return stub.fetch(request)
+      return stub.fetch(request);
     }
 
     // For all other requests, pass to the Nuxt handler
-    return nitroApp.default.fetch(request, env, ctx)
-  }
-}
+    return nitroApp.default.fetch(request, env, ctx);
+  },
+};
