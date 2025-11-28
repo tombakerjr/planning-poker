@@ -9,7 +9,7 @@ const roomId = route.params.id as string;
 
 // Initialize composables
 const pokerRoom = usePokerRoom(roomId);
-const { userPreferences, updatePreferences } = useSessionStorage();
+const { updatePreferences } = useSessionStorage();
 
 // Provide the poker room to child components with type safety
 provide(PokerRoomKey, pokerRoom);
@@ -18,7 +18,6 @@ const {
   currentUser,
   isJoined,
   status,
-  isLoading,
   reconnectAttempts,
   connectionQuality,
   currentLatency,
@@ -81,7 +80,7 @@ const copyRoomLink = async () => {
   try {
     await navigator.clipboard.writeText(roomUrl);
     toastSuccess('Room link copied to clipboard!');
-  } catch (error) {
+  } catch {
     // Fallback for older browsers
     const textArea = document.createElement('textarea');
     textArea.value = roomUrl;
