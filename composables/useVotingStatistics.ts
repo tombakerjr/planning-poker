@@ -161,10 +161,12 @@ function countExcludedVotes(participants: Participant[]): ExcludedVote[] {
 
 /**
  * Find outliers (values more than 2 standard deviations from mean)
+ * Returns unique outlier values (no duplicates even if multiple people voted the same outlier)
  */
 function findOutliers(values: number[], mean: number, stdDev: number): number[] {
   if (stdDev === 0) return [];
-  return values.filter(v => Math.abs(v - mean) > 2 * stdDev);
+  const outliers = values.filter(v => Math.abs(v - mean) > 2 * stdDev);
+  return Array.from(new Set(outliers));
 }
 
 /**

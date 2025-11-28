@@ -108,6 +108,19 @@ describe('useVotingStatistics', () => {
 
       expect(stats.value.outliers).toContain(21);
     });
+
+    it('deduplicates outliers when multiple people vote the same outlier value', () => {
+      // Many people vote 3, two people vote 100 (extreme outlier)
+      // Even with 2 votes, 100 is >2 std devs from mean and should only appear once
+      const participants = ref(createParticipants([3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 100, 100]));
+      const scaleType = ref('fibonacci');
+
+      const stats = useVotingStatistics(participants, scaleType);
+
+      // 100 should appear only once in outliers, even though 2 people voted for it
+      expect(stats.value.outliers).toEqual([100]);
+      expect(stats.value.outliers).toHaveLength(1);
+    });
   });
 
   describe('special vote handling', () => {
@@ -196,6 +209,23 @@ describe('useVotingStatistics', () => {
   });
 
   describe('edge cases', () => {
+    it('handles percentage rounding (may not sum to exactly 100%)', () => {
+      // 3 different votes = 33.33% each, rounds to 33% each = 99% total
+      const participants = ref(createParticipants([1, 3, 5]));
+      const scaleType = ref('fibonacci');
+
+      const stats = useVotingStatistics(participants, scaleType);
+
+      // Each vote is 33.33%, rounds to 33%
+      expect(stats.value.distribution).toHaveLength(3);
+      for (const item of stats.value.distribution) {
+        expect(item.percentage).toBe(33);
+      }
+      // Total is 99%, not 100% - this is expected behavior with rounding
+      const totalPercentage = stats.value.distribution.reduce((sum, item) => sum + item.percentage, 0);
+      expect(totalPercentage).toBe(99);
+    });
+
     it('handles single vote', () => {
       const participants = ref(createParticipants([5]));
       const scaleType = ref('fibonacci');
