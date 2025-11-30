@@ -29,6 +29,8 @@ export interface RoomState {
   storyTitle: string
   votingScale?: string
   autoReveal?: boolean
+  timerEndTime?: number | null
+  timerAutoReveal?: boolean
 }
 
 export interface RoomMessage {
@@ -41,7 +43,7 @@ export interface RoomMessage {
 export interface QueuedMessage {
   message: any
   timestamp: number
-  action: 'vote' | 'setStory' | 'setScale' | 'setAutoReveal'
+  action: 'vote' | 'setStory' | 'setScale' | 'setAutoReveal' | 'startTimer' | 'cancelTimer' | 'setTimerAutoReveal'
 }
 
 export type ConnectionQuality = 'good' | 'fair' | 'poor' | 'disconnected';
@@ -78,6 +80,8 @@ export function usePokerRoom(roomId: string) {
     storyTitle: '',
     votingScale: 'fibonacci',
     autoReveal: false,
+    timerEndTime: null,
+    timerAutoReveal: false,
   });
 
   const currentUser = ref<{ id: string; name: string } | null>(null);
@@ -102,6 +106,11 @@ export function usePokerRoom(roomId: string) {
 
   // Message queue
   const messageQueue = ref<QueuedMessage[]>([]);
+
+  // Timer state (computed locally from timerEndTime)
+  const timerRemaining = ref<number | null>(null);
+  const timerExpired = ref<boolean>(false);
+  let timerInterval: ReturnType<typeof setInterval> | null = null;
 
   let ws: WebSocket | null = null;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -130,6 +139,68 @@ export function usePokerRoom(roomId: string) {
 
     // Fair: Everything in between
     return 'fair';
+  }
+
+  // Timer interval management
+  function stopTimerInterval() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function updateTimerState() {
+    const endTime = roomState.value.timerEndTime;
+
+    if (endTime === null || endTime === undefined) {
+      // No timer running
+      stopTimerInterval();
+      timerRemaining.value = null;
+      // Don't reset timerExpired here - let it stay true briefly for UI feedback
+      return;
+    }
+
+    // Calculate remaining time
+    const now = Date.now();
+    const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+    timerRemaining.value = remaining;
+
+    if (remaining === 0) {
+      // Timer just expired
+      timerExpired.value = true;
+      stopTimerInterval();
+      // Reset expired flag after 3 seconds (for UI feedback)
+      setTimeout(() => {
+        timerExpired.value = false;
+      }, 3000);
+      return;
+    }
+
+    // Start interval if not already running
+    if (!timerInterval) {
+      timerExpired.value = false;
+      timerInterval = setInterval(() => {
+        const currentEndTime = roomState.value.timerEndTime;
+        if (currentEndTime === null || currentEndTime === undefined) {
+          stopTimerInterval();
+          timerRemaining.value = null;
+          return;
+        }
+
+        const nowInner = Date.now();
+        const remainingInner = Math.max(0, Math.ceil((currentEndTime - nowInner) / 1000));
+        timerRemaining.value = remainingInner;
+
+        if (remainingInner === 0) {
+          timerExpired.value = true;
+          stopTimerInterval();
+          // Reset expired flag after 3 seconds
+          setTimeout(() => {
+            timerExpired.value = false;
+          }, 3000);
+        }
+      }, 1000);
+    }
   }
 
   // Message queue management
@@ -262,7 +333,11 @@ export function usePokerRoom(roomId: string) {
             storyTitle: message.payload.storyTitle || '',
             votingScale: message.payload.votingScale || 'fibonacci',
             autoReveal: message.payload.autoReveal || false,
+            timerEndTime: message.payload.timerEndTime ?? null,
+            timerAutoReveal: message.payload.timerAutoReveal || false,
           };
+          // Update timer countdown based on new timerEndTime
+          updateTimerState();
         }
         break;
 
@@ -890,6 +965,89 @@ export function usePokerRoom(roomId: string) {
     }
   };
 
+  // Valid timer durations (must match server-side VALID_TIMER_DURATIONS)
+  const VALID_TIMER_DURATIONS = [30, 60, 120, 300] as const;
+
+  const startTimer = async (duration: number) => {
+    if (!isJoined.value) {
+      toast.error('Must join room before starting timer');
+      return false;
+    }
+
+    // Validate duration client-side
+    if (!VALID_TIMER_DURATIONS.includes(duration as typeof VALID_TIMER_DURATIONS[number])) {
+      toast.error('Invalid timer duration. Use 30, 60, 120, or 300 seconds.');
+      return false;
+    }
+
+    const message = {
+      type: 'startTimer',
+      duration,
+    };
+
+    // If not connected, queue the message
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return queueMessage(message, 'startTimer');
+    }
+
+    try {
+      ws.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      logger.error('Failed to start timer:', error);
+      return queueMessage(message, 'startTimer');
+    }
+  };
+
+  const cancelTimer = async () => {
+    if (!isJoined.value) {
+      toast.error('Must join room before canceling timer');
+      return false;
+    }
+
+    const message = {
+      type: 'cancelTimer',
+    };
+
+    // If not connected, queue the message
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return queueMessage(message, 'cancelTimer');
+    }
+
+    try {
+      ws.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      logger.error('Failed to cancel timer:', error);
+      return queueMessage(message, 'cancelTimer');
+    }
+  };
+
+  const setTimerAutoReveal = async (enabled: boolean) => {
+    if (!isJoined.value) {
+      toast.error('Must join room before changing timer auto-reveal setting');
+      return false;
+    }
+
+    const message = {
+      type: 'setTimerAutoReveal',
+      enabled,
+    };
+
+    // If not connected, queue the message
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return queueMessage(message, 'setTimerAutoReveal');
+    }
+
+    try {
+      ws.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      logger.error('Failed to set timer auto-reveal:', error);
+      return queueMessage(message, 'setTimerAutoReveal');
+    }
+  };
+
   const leaveRoom = () => {
     // Save session to history before leaving (Phase 6)
     // Only save once - prevents duplicate saves if leaveRoom called before unmount
@@ -919,7 +1077,13 @@ export function usePokerRoom(roomId: string) {
       storyTitle: '',
       votingScale: 'fibonacci',
       autoReveal: false,
+      timerEndTime: null,
+      timerAutoReveal: false,
     };
+    // Clear timer state
+    stopTimerInterval();
+    timerRemaining.value = null;
+    timerExpired.value = false;
     // Don't clear session on leave - keep it for potential rejoin
   };
 
@@ -968,6 +1132,8 @@ export function usePokerRoom(roomId: string) {
       });
     }
     closeConnection();
+    // Clean up timer interval
+    stopTimerInterval();
   });
 
   return {
@@ -988,6 +1154,10 @@ export function usePokerRoom(roomId: string) {
     queuedMessageCount,
     maintenance: readonly(maintenance),
 
+    // Timer state
+    timerRemaining: readonly(timerRemaining),
+    timerExpired: readonly(timerExpired),
+
     // Computed
     myVote,
     votingComplete,
@@ -1006,6 +1176,9 @@ export function usePokerRoom(roomId: string) {
     setStoryTitle,
     setVotingScale,
     setAutoReveal,
+    startTimer,
+    cancelTimer,
+    setTimerAutoReveal,
   };
 }
 
