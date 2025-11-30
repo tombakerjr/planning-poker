@@ -1,6 +1,7 @@
 // Custom worker entrypoint that exports both the default export and Durable Objects
 import * as nitroApp from './.output/server/index.mjs';
 import { createConfig } from './server/utils/config';
+import { logger } from './server/utils/logger';
 export { PokerRoom } from './server/poker-room';
 
 interface Env {
@@ -22,8 +23,14 @@ export default {
     // Check cache first to avoid KV reads on every request
     if (!killSwitchCache || now > killSwitchCache.expiry) {
       const config = createConfig(env);
-      const appEnabled = await config.get('APP_ENABLED');
+      const [appEnabled, logLevel] = await Promise.all([
+        config.get('APP_ENABLED'),
+        config.get('LOG_LEVEL'),
+      ]);
       config.destroy();
+
+      // Configure logger with feature flag value
+      logger.setLevel(logLevel);
 
       killSwitchCache = {
         enabled: appEnabled,
