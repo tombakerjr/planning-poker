@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Bug fix: Removed server logger import (server code should not be imported in client components)
 import { PokerRoomKey } from '~/composables/usePokerRoom';
 import { useVotingScale } from '~/composables/useVotingScale';
 

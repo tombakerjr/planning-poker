@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// Bug fix: Use console.error directly instead of server logger import
-// (server code should not be imported in client components)
-
 const isCreating = ref(false);
 const error = ref('');
 

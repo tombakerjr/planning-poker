@@ -10,13 +10,28 @@ export enum LogLevel {
   ERROR = 3,
 }
 
+export type LogLevelName = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+
 class Logger {
   private level: LogLevel;
 
   constructor() {
-    // In production, only log warnings and errors
-    // In development, log everything
-    this.level = process.env.NODE_ENV === 'production' ? LogLevel.WARN : LogLevel.DEBUG;
+    // Default: INFO (balanced default if feature flag unavailable)
+    // Can be overridden via setLevel() after config is loaded
+    this.level = LogLevel.INFO;
+  }
+
+  /**
+   * Set log level dynamically (called after config loads LOG_LEVEL flag)
+   * Defaults to INFO if an invalid level name is provided
+   */
+  setLevel(levelName: LogLevelName): void {
+    if (!(levelName in LogLevel)) {
+      console.error(`Invalid log level: ${levelName}, defaulting to INFO`);
+      this.level = LogLevel.INFO;
+      return;
+    }
+    this.level = LogLevel[levelName];
   }
 
   private log(level: LogLevel, message: string, ...args: any[]) {

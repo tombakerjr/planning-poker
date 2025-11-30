@@ -329,6 +329,37 @@ All user inputs (names, votes) are validated server-side:
 - Messages: Max 10KB size
 - Rate limiting: Max 10 messages/second
 
+### Logging Conventions
+
+**Server-side logging** uses the structured logger at `server/utils/logger.ts`:
+```typescript
+import { logger } from './logger';
+
+logger.debug('Detailed debugging info', { context: 'optional' });
+logger.info('General information');
+logger.warn('Warning message');
+logger.error('Error occurred', error);
+```
+
+The logger outputs structured JSON for Cloudflare Workers Logs, enabling filtering and analysis in the dashboard. Log level is controlled by the `LOG_LEVEL` feature flag (changes propagate within 60 seconds due to config caching).
+
+**Log level propagation:** The logger is a module-level singleton. In Cloudflare Workers, the main worker and Durable Objects may run in separate isolates, each with their own logger instance. Both `worker.ts` and `server/poker-room.ts` call `logger.setLevel()` after loading config to ensure their respective logger instances are configured. When `LOG_LEVEL` changes in GrowthBook, the new value propagates to KV instantly via webhook, then to running code within 60 seconds as config caches expire. This is accepted eventual-consistency behavior.
+
+**Client-side logging** uses standard `console.*` methods:
+```typescript
+console.log('[ComponentName] Message');
+console.warn('[ComponentName] Warning');
+console.error('[ComponentName] Error:', error);
+```
+
+Client logs appear in the browser DevTools console. Use a `[ComponentName]` prefix for easier filtering.
+
+**Guidelines:**
+- Never import server logger utilities in client code (Vue components, composables)
+- Durable Objects should import and use the shared logger from `server/utils/logger.ts`
+- Use `logger.error()` for caught exceptions on the server
+- Avoid logging sensitive data (user IDs, session tokens, votes before reveal)
+
 ## Testing Strategy
 
 ### Unit Tests
