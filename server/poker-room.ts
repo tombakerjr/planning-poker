@@ -360,6 +360,7 @@ export class PokerRoom extends DurableObject {
 
     // Check for timer expiration on every message
     // Server doesn't run an interval; just checks on message receipt
+    // IMPORTANT: Persist immediately if timer expired to prevent state loss on early returns
     if (roomState.timerEndTime !== null && roomState.timerEndTime !== undefined && Date.now() >= roomState.timerEndTime) {
       // Timer has expired
       if (roomState.timerAutoReveal && !roomState.votesRevealed) {
@@ -368,6 +369,10 @@ export class PokerRoom extends DurableObject {
       }
       // Always clear the expired timer
       roomState.timerEndTime = null;
+      // Persist and broadcast timer expiration immediately
+      // This ensures timer state is saved even if switch statement returns early (e.g., validation failure)
+      await this.setRoomState(roomState);
+      this.scheduleBroadcast();
     }
 
     switch (message.type) {

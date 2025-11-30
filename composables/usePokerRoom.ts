@@ -111,6 +111,7 @@ export function usePokerRoom(roomId: string) {
   const timerRemaining = ref<number | null>(null);
   const timerExpired = ref<boolean>(false);
   let timerInterval: ReturnType<typeof setInterval> | null = null;
+  let expiredResetTimeout: ReturnType<typeof setTimeout> | null = null;
 
   let ws: WebSocket | null = null;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -147,6 +148,26 @@ export function usePokerRoom(roomId: string) {
       clearInterval(timerInterval);
       timerInterval = null;
     }
+    // Also clear the expired reset timeout to prevent memory leaks
+    if (expiredResetTimeout) {
+      clearTimeout(expiredResetTimeout);
+      expiredResetTimeout = null;
+    }
+  }
+
+  // Handle timer expiration - extracted to avoid duplication
+  function handleTimerExpiration() {
+    timerExpired.value = true;
+    stopTimerInterval();
+    // Reset expired flag after 3 seconds (for UI feedback)
+    // Clear any existing timeout first to prevent multiple scheduled resets
+    if (expiredResetTimeout) {
+      clearTimeout(expiredResetTimeout);
+    }
+    expiredResetTimeout = setTimeout(() => {
+      timerExpired.value = false;
+      expiredResetTimeout = null;
+    }, 3000);
   }
 
   function updateTimerState() {
@@ -167,12 +188,7 @@ export function usePokerRoom(roomId: string) {
 
     if (remaining === 0) {
       // Timer just expired
-      timerExpired.value = true;
-      stopTimerInterval();
-      // Reset expired flag after 3 seconds (for UI feedback)
-      setTimeout(() => {
-        timerExpired.value = false;
-      }, 3000);
+      handleTimerExpiration();
       return;
     }
 
@@ -192,12 +208,7 @@ export function usePokerRoom(roomId: string) {
         timerRemaining.value = remainingInner;
 
         if (remainingInner === 0) {
-          timerExpired.value = true;
-          stopTimerInterval();
-          // Reset expired flag after 3 seconds
-          setTimeout(() => {
-            timerExpired.value = false;
-          }, 3000);
+          handleTimerExpiration();
         }
       }, 1000);
     }
