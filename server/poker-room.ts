@@ -459,6 +459,10 @@ export class PokerRoom extends DurableObject {
           this.autoRevealTimeout = undefined;
         }
 
+        // Cancel active timer since votes are now revealed
+        // Timer's purpose was to reveal votes, which is now done
+        roomState.timerEndTime = null;
+
         roomState.votesRevealed = true;
         break;
       }
@@ -529,6 +533,10 @@ export class PokerRoom extends DurableObject {
           this.autoRevealTimeout = undefined;
         }
 
+        // Cancel active timer since votes are being cleared
+        // Timer would be meaningless with no votes to reveal
+        roomState.timerEndTime = null;
+
         // Update voting scale and clear all votes
         // Existing votes may be invalid on the new scale (e.g., "21" on Fibonacci → T-shirt sizes)
         roomState.votingScale = message.scale;
@@ -577,8 +585,8 @@ export class PokerRoom extends DurableObject {
           return;
         }
 
-        // Validate duration is one of the allowed presets
-        if (!VALID_TIMER_DURATIONS.includes(message.duration as typeof VALID_TIMER_DURATIONS[number])) {
+        // Validate duration is a number and one of the allowed presets
+        if (typeof message.duration !== 'number' || !VALID_TIMER_DURATIONS.includes(message.duration as typeof VALID_TIMER_DURATIONS[number])) {
           ws.send(JSON.stringify({
             type: 'error',
             payload: { message: 'Invalid timer duration. Use 30, 60, 120, or 300 seconds.' },

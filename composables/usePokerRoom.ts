@@ -591,6 +591,7 @@ export function usePokerRoom(roomId: string) {
       reconnectTimeout = null;
     }
     stopHeartbeat();
+    stopTimerInterval();
 
     // Clear connection monitoring state to prevent memory leaks
     pingTimestamps.clear();
