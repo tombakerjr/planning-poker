@@ -341,7 +341,9 @@ logger.warn('Warning message');
 logger.error('Error occurred', error);
 ```
 
-The logger outputs structured JSON for Cloudflare Workers Logs, enabling filtering and analysis in the dashboard. Log level is controlled by the `LOG_LEVEL` feature flag.
+The logger outputs structured JSON for Cloudflare Workers Logs, enabling filtering and analysis in the dashboard. Log level is controlled by the `LOG_LEVEL` feature flag (changes propagate within 60 seconds due to config caching).
+
+**Log level propagation:** The logger is a singleton shared across the worker and Durable Objects. When `LOG_LEVEL` changes in GrowthBook, the new value propagates to KV instantly via webhook, then to running code within 60 seconds as config caches expire. During this window, some requests may briefly log at the old level. This is accepted eventual-consistency behavior.
 
 **Client-side logging** uses standard `console.*` methods:
 ```typescript
