@@ -343,7 +343,7 @@ logger.error('Error occurred', error);
 
 The logger outputs structured JSON for Cloudflare Workers Logs, enabling filtering and analysis in the dashboard. Log level is controlled by the `LOG_LEVEL` feature flag (changes propagate within 60 seconds due to config caching).
 
-**Log level propagation:** The logger is a singleton shared across the worker and Durable Objects. When `LOG_LEVEL` changes in GrowthBook, the new value propagates to KV instantly via webhook, then to running code within 60 seconds as config caches expire. During this window, some requests may briefly log at the old level. This is accepted eventual-consistency behavior.
+**Log level propagation:** The logger is a module-level singleton. In Cloudflare Workers, the main worker and Durable Objects may run in separate isolates, each with their own logger instance. Both `worker.ts` and `server/poker-room.ts` call `logger.setLevel()` after loading config to ensure their respective logger instances are configured. When `LOG_LEVEL` changes in GrowthBook, the new value propagates to KV instantly via webhook, then to running code within 60 seconds as config caches expire. This is accepted eventual-consistency behavior.
 
 **Client-side logging** uses standard `console.*` methods:
 ```typescript
