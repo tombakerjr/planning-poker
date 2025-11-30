@@ -1,47 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { createConfig } from './utils/config';
-
-// Simple logging utility for Durable Objects
-enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-}
-
-// Global log level - will be set from config
-let CURRENT_LOG_LEVEL = LogLevel.WARN;
-
-function log(level: LogLevel, message: string, ...args: any[]) {
-  if (level < CURRENT_LOG_LEVEL) return;
-
-  const timestamp = new Date().toISOString();
-  const levelName = LogLevel[level];
-  const logEntry = { timestamp, level: levelName, message, ...(args.length > 0 && { data: args }) };
-
-  switch (level) {
-    case LogLevel.DEBUG:
-      console.debug(JSON.stringify(logEntry));
-      break;
-    case LogLevel.INFO:
-      console.log(JSON.stringify(logEntry));
-      break;
-    case LogLevel.WARN:
-      console.warn(JSON.stringify(logEntry));
-      break;
-    case LogLevel.ERROR:
-      console.error(JSON.stringify(logEntry));
-      break;
-  }
-}
-
-const logger = {
-  debug: (msg: string, ...args: any[]) => log(LogLevel.DEBUG, msg, ...args),
-  info: (msg: string, ...args: any[]) => log(LogLevel.INFO, msg, ...args),
-  warn: (msg: string, ...args: any[]) => log(LogLevel.WARN, msg, ...args),
-  error: (msg: string, ...args: any[]) => log(LogLevel.ERROR, msg, ...args),
-};
+import { logger } from './utils/logger';
 
 // Non-configurable constants
 const MAX_NAME_LENGTH = 50;
@@ -194,9 +154,9 @@ export class PokerRoom extends DurableObject {
       this.AUTO_REVEAL_DELAY_MS = await config.get('AUTO_REVEAL_DELAY_MS');
       this.APP_ENABLED = await config.get('APP_ENABLED');
 
-      // Update log level
+      // Update log level via shared logger
       const logLevel = await config.get('LOG_LEVEL');
-      CURRENT_LOG_LEVEL = LogLevel[logLevel as keyof typeof LogLevel] ?? LogLevel.WARN;
+      logger.setLevel(logLevel);
 
       config.destroy();
       this.configLoadedAt = now;

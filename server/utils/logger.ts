@@ -16,15 +16,21 @@ class Logger {
   private level: LogLevel;
 
   constructor() {
-    // Default: WARN in production, DEBUG in development
+    // Default: INFO (balanced default if feature flag unavailable)
     // Can be overridden via setLevel() after config is loaded
-    this.level = process.env.NODE_ENV === 'production' ? LogLevel.WARN : LogLevel.DEBUG;
+    this.level = LogLevel.INFO;
   }
 
   /**
    * Set log level dynamically (called after config loads LOG_LEVEL flag)
+   * Defaults to INFO if an invalid level name is provided
    */
   setLevel(levelName: LogLevelName): void {
+    if (!(levelName in LogLevel)) {
+      console.error(`Invalid log level: ${levelName}, defaulting to INFO`);
+      this.level = LogLevel.INFO;
+      return;
+    }
     this.level = LogLevel[levelName];
   }
 

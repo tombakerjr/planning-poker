@@ -354,6 +354,7 @@ Client logs appear in the browser DevTools console. Use a `[ComponentName]` pref
 
 **Guidelines:**
 - Never import server logger utilities in client code (Vue components, composables)
+- Durable Objects should import and use the shared logger from `server/utils/logger.ts`
 - Use `logger.error()` for caught exceptions on the server
 - Avoid logging sensitive data (user IDs, session tokens, votes before reveal)
 
