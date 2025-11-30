@@ -180,3 +180,34 @@ Checkbox near timer controls: "Auto-reveal on timer"
 - Timer precision of 1-2 seconds is acceptable
 - No audio alerts in initial implementation
 - Designed for future role-gating without breaking changes
+
+## Known Limitations
+
+### Timer Expiration Requires Activity
+
+The server checks for timer expiration **on message receipt**, not via a background interval. This design choice:
+
+- **Pros**: No server-side intervals (efficient for Durable Objects), simpler implementation
+- **Cons**: Auto-reveal requires at least one message after timer expires
+
+**Behavior**: If a timer expires with `timerAutoReveal=true` but no messages arrive:
+- Client countdown shows "Time's up!" (computed locally from `timerEndTime`)
+- Server won't auto-reveal until the next message (vote, ping, heartbeat, etc.)
+- Heartbeats run every 30 seconds, so worst-case delay is ~30 seconds
+
+**Why this is acceptable**:
+1. Active voting rooms have continuous message flow (votes, pings)
+2. Client UI shows timer expired immediately (visual feedback correct)
+3. Heartbeat ensures eventual server-side processing
+4. Adding DO alarms would significantly increase complexity
+
+**Future enhancement**: If sub-second auto-reveal is needed, implement using Durable Object alarms.
+
+### Timer Clears on Multiple Actions
+
+Timer is automatically cancelled when:
+- Reset (new round) is triggered
+- Voting scale is changed (votes cleared)
+- Votes are manually revealed (timer's purpose fulfilled)
+
+This ensures clean state and prevents "phantom" timers.

@@ -30,7 +30,9 @@ Master kill switch (`APP_ENABLED` flag) returns maintenance page (503) when disa
   votesRevealed: boolean,
   storyTitle: string,
   votingScale?: string,      // fibonacci, modified-fibonacci, t-shirt, etc.
-  autoReveal?: boolean       // auto-reveal votes when everyone has voted
+  autoReveal?: boolean,      // auto-reveal votes when everyone has voted
+  timerEndTime?: number | null,  // Unix timestamp when timer expires
+  timerAutoReveal?: boolean      // auto-reveal when timer expires
 }
 ```
 
@@ -38,7 +40,7 @@ Master kill switch (`APP_ENABLED` flag) returns maintenance page (503) when disa
 All WebSocket messages follow:
 ```typescript
 {
-  type: 'auth' | 'join' | 'vote' | 'reveal' | 'reset' | 'ping' | 'pong' | 'setStory' | 'setScale' | 'setAutoReveal' | 'update' | 'error',
+  type: 'auth' | 'join' | 'vote' | 'reveal' | 'reset' | 'ping' | 'pong' | 'setStory' | 'setScale' | 'setAutoReveal' | 'startTimer' | 'cancelTimer' | 'setTimerAutoReveal' | 'update' | 'error',
   payload?: any
 }
 ```
@@ -46,6 +48,7 @@ All WebSocket messages follow:
 ### Key Features
 - **Multiple voting scales**: Fibonacci, Modified Fibonacci, T-Shirt sizes, Powers of 2
 - **Auto-reveal**: Automatically reveal votes when all participants have voted
+- **Timer**: Optional countdown timer (30s, 1m, 2m, 5m) with configurable auto-reveal on expiration
 - **Story titles**: Set context for each voting round
 - **Dark/light mode**: Theme support with system preference detection
 - **Session persistence**: Maintains user state across page refreshes and hibernation
