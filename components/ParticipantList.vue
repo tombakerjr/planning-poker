@@ -184,6 +184,9 @@ function getParticipantColor(userId: string): string {
       </p>
     </div>
 
+    <!-- Timer Controls -->
+    <TimerControls />
+
     <!-- Voting Progress -->
     <div
       v-if="roomState.participants.length > 0"

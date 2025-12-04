@@ -307,7 +307,7 @@ The client attempts reconnection with exponential backoff (max 10 attempts). Aft
 All WebSocket messages follow this structure:
 ```typescript
 {
-  type: 'join' | 'vote' | 'reveal' | 'reset' | 'setStory' | 'setScale' | 'setAutoReveal' | 'update' | 'error' | 'ping' | 'pong',
+  type: 'join' | 'vote' | 'reveal' | 'reset' | 'setStory' | 'setScale' | 'setAutoReveal' | 'startTimer' | 'cancelTimer' | 'setTimerAutoReveal' | 'update' | 'error' | 'ping' | 'pong',
   payload?: any
 }
 ```

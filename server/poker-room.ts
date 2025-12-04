@@ -19,6 +19,9 @@ const DEFAULT_APP_ENABLED = true;
 
 // Voting scale definitions (must match client-side definitions)
 const VALID_SCALES = ['fibonacci', 'modified-fibonacci', 't-shirt', 'powers-of-2', 'linear'] as const;
+
+// Valid timer durations in seconds (must match client-side definitions)
+const VALID_TIMER_DURATIONS = [30, 60, 120, 300] as const;
 type ValidScale = typeof VALID_SCALES[number];
 
 const SCALE_VALUES: Record<ValidScale, (string | number)[]> = {
@@ -40,6 +43,8 @@ interface RoomStorage {
   storyTitle: string;
   votingScale?: string; // fibonacci, modified-fibonacci, t-shirt, etc.
   autoReveal?: boolean; // auto-reveal votes when everyone has voted
+  timerEndTime?: number | null; // Unix timestamp (ms) when timer expires
+  timerAutoReveal?: boolean; // auto-reveal when timer expires
 }
 
 interface AuthMessage {
@@ -91,6 +96,20 @@ interface SetAutoRevealMessage {
   autoReveal: boolean;
 }
 
+interface StartTimerMessage {
+  type: 'startTimer';
+  duration: number; // seconds: 30, 60, 120, 300
+}
+
+interface CancelTimerMessage {
+  type: 'cancelTimer';
+}
+
+interface SetTimerAutoRevealMessage {
+  type: 'setTimerAutoReveal';
+  enabled: boolean;
+}
+
 type WebSocketMessage =
   | AuthMessage
   | JoinMessage
@@ -101,7 +120,10 @@ type WebSocketMessage =
   | PongMessage
   | SetStoryMessage
   | SetScaleMessage
-  | SetAutoRevealMessage;
+  | SetAutoRevealMessage
+  | StartTimerMessage
+  | CancelTimerMessage
+  | SetTimerAutoRevealMessage;
 
 interface WebSocketMeta {
   userId: string;
@@ -336,6 +358,23 @@ export class PokerRoom extends DurableObject {
   private async handleMessage(ws: WebSocket, userId: string, message: WebSocketMessage) {
     const roomState = await this.getRoomState();
 
+    // Check for timer expiration on every message
+    // Server doesn't run an interval; just checks on message receipt
+    // IMPORTANT: Persist immediately if timer expired to prevent state loss on early returns
+    if (roomState.timerEndTime !== null && roomState.timerEndTime !== undefined && Date.now() >= roomState.timerEndTime) {
+      // Timer has expired
+      if (roomState.timerAutoReveal && !roomState.votesRevealed) {
+        // Auto-reveal votes when timer expires (if enabled)
+        roomState.votesRevealed = true;
+      }
+      // Always clear the expired timer
+      roomState.timerEndTime = null;
+      // Persist and broadcast timer expiration immediately
+      // This ensures timer state is saved even if switch statement returns early (e.g., validation failure)
+      await this.setRoomState(roomState);
+      this.scheduleBroadcast();
+    }
+
     switch (message.type) {
       case 'join': {
         // Add a new participant to the room
@@ -420,6 +459,10 @@ export class PokerRoom extends DurableObject {
           this.autoRevealTimeout = undefined;
         }
 
+        // Cancel active timer since votes are now revealed
+        // Timer's purpose was to reveal votes, which is now done
+        roomState.timerEndTime = null;
+
         roomState.votesRevealed = true;
         break;
       }
@@ -438,6 +481,9 @@ export class PokerRoom extends DurableObject {
           clearTimeout(this.autoRevealTimeout);
           this.autoRevealTimeout = undefined;
         }
+
+        // Clear any running timer (new round = fresh start)
+        roomState.timerEndTime = null;
 
         roomState.votesRevealed = false;
         for (const id in roomState.participants) {
@@ -487,6 +533,10 @@ export class PokerRoom extends DurableObject {
           this.autoRevealTimeout = undefined;
         }
 
+        // Cancel active timer since votes are being cleared
+        // Timer would be meaningless with no votes to reveal
+        roomState.timerEndTime = null;
+
         // Update voting scale and clear all votes
         // Existing votes may be invalid on the new scale (e.g., "21" on Fibonacci → T-shirt sizes)
         roomState.votingScale = message.scale;
@@ -523,6 +573,65 @@ export class PokerRoom extends DurableObject {
         }
 
         roomState.autoReveal = message.autoReveal;
+        break;
+      }
+      case 'startTimer': {
+        // Validate user has joined before starting timer
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            payload: { message: 'Must join room before starting timer' },
+          }));
+          return;
+        }
+
+        // Validate duration is a number and one of the allowed presets
+        if (typeof message.duration !== 'number' || !VALID_TIMER_DURATIONS.includes(message.duration as typeof VALID_TIMER_DURATIONS[number])) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            payload: { message: 'Invalid timer duration. Use 30, 60, 120, or 300 seconds.' },
+          }));
+          return;
+        }
+
+        // Set timer end time as absolute timestamp
+        roomState.timerEndTime = Date.now() + (message.duration * 1000);
+        break;
+      }
+      case 'cancelTimer': {
+        // Validate user has joined before canceling timer
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            payload: { message: 'Must join room before canceling timer' },
+          }));
+          return;
+        }
+
+        // Clear the timer
+        roomState.timerEndTime = null;
+        break;
+      }
+      case 'setTimerAutoReveal': {
+        // Validate user has joined before setting timer auto-reveal
+        if (!roomState.participants[userId]) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            payload: { message: 'Must join room before changing timer auto-reveal setting' },
+          }));
+          return;
+        }
+
+        // Validate enabled is a boolean
+        if (typeof message.enabled !== 'boolean') {
+          ws.send(JSON.stringify({
+            type: 'error',
+            payload: { message: 'Invalid timer auto-reveal value' },
+          }));
+          return;
+        }
+
+        roomState.timerAutoReveal = message.enabled;
         break;
       }
     }
@@ -611,6 +720,8 @@ export class PokerRoom extends DurableObject {
       storyTitle: '',
       votingScale: 'fibonacci',
       autoReveal: false,
+      timerEndTime: null,
+      timerAutoReveal: false,
     };
   }
 

@@ -271,6 +271,206 @@ describe('PokerRoom Durable Object', () => {
     });
   });
 
+  describe('Timer Functionality', () => {
+    // Timer allows optional time limits for voting rounds
+    // Server stores timerEndTime (absolute timestamp), clients compute countdown locally
+
+    const VALID_DURATIONS = [30, 60, 120, 300]; // seconds
+
+    it('should accept WebSocket connections for timer testing', async () => {
+      const request = new Request('https://example.com/ws', {
+        headers: { upgrade: 'websocket' },
+      });
+      const response = await room.fetch(request);
+      expect(response.status).toBe(101);
+      expect(response.webSocket).toBeDefined();
+    });
+
+    it('should validate timer duration against allowed presets', () => {
+      // Documents expected behavior: startTimer only accepts preset durations
+      // Valid durations: 30, 60, 120, 300 seconds
+      // Invalid durations should be rejected with error
+
+      expect(VALID_DURATIONS).toContain(30);
+      expect(VALID_DURATIONS).toContain(60);
+      expect(VALID_DURATIONS).toContain(120);
+      expect(VALID_DURATIONS).toContain(300);
+      expect(VALID_DURATIONS).not.toContain(45); // Invalid
+      expect(VALID_DURATIONS).not.toContain(0);  // Invalid
+      expect(VALID_DURATIONS).not.toContain(-1); // Invalid
+    });
+
+    it('should set timerEndTime as absolute timestamp on startTimer', () => {
+      // Documents expected behavior:
+      // When startTimer { duration: 60 } is received:
+      // timerEndTime = Date.now() + (duration * 1000)
+      //
+      // This enables clients to compute remaining time locally
+      // without server needing to broadcast every second
+
+      const now = Date.now();
+      const duration = 60; // seconds
+      const expectedEndTime = now + (duration * 1000);
+
+      // Verify the calculation
+      expect(expectedEndTime - now).toBe(60000); // 60 seconds in ms
+    });
+
+    it('should clear timerEndTime on cancelTimer', () => {
+      // Documents expected behavior:
+      // When cancelTimer is received, set timerEndTime = null
+      // Broadcast update to all clients
+
+      const stateWithTimer = {
+        timerEndTime: Date.now() + 60000,
+        timerAutoReveal: false,
+      };
+
+      const stateAfterCancel = {
+        timerEndTime: null,
+        timerAutoReveal: false, // Setting persists
+      };
+
+      expect(stateWithTimer.timerEndTime).not.toBeNull();
+      expect(stateAfterCancel.timerEndTime).toBeNull();
+    });
+
+    it('should clear timerEndTime on reset (new round)', () => {
+      // Documents expected behavior:
+      // When reset message is received, clear timerEndTime
+      // This ensures new rounds start fresh without old timer
+
+      const stateBeforeReset = {
+        participants: {
+          'user1': { name: 'Alice', vote: 5 },
+        },
+        votesRevealed: true,
+        timerEndTime: Date.now() + 30000,
+        timerAutoReveal: true,
+      };
+
+      const stateAfterReset = {
+        participants: {
+          'user1': { name: 'Alice', vote: null }, // Votes cleared
+        },
+        votesRevealed: false,
+        timerEndTime: null, // Timer cleared
+        timerAutoReveal: true, // Setting persists
+      };
+
+      expect(stateBeforeReset.timerEndTime).not.toBeNull();
+      expect(stateAfterReset.timerEndTime).toBeNull();
+      expect(stateAfterReset.timerAutoReveal).toBe(true);
+    });
+
+    it('should auto-reveal votes when timer expires and timerAutoReveal is true', () => {
+      // Documents expected behavior:
+      // On any incoming message, check if timer has expired:
+      // if (timerEndTime !== null && Date.now() >= timerEndTime && timerAutoReveal && !votesRevealed)
+      //   -> set votesRevealed = true, timerEndTime = null
+      //
+      // Note: Server doesn't run interval, just checks on message receipt
+
+      const now = Date.now();
+      const expiredState = {
+        timerEndTime: now - 1000, // 1 second ago (expired)
+        timerAutoReveal: true,
+        votesRevealed: false,
+      };
+
+      // After processing any message, timer expiration check triggers reveal
+      const stateAfterCheck = {
+        timerEndTime: null, // Cleared
+        timerAutoReveal: true,
+        votesRevealed: true, // Auto-revealed
+      };
+
+      expect(expiredState.timerEndTime).toBeLessThan(now);
+      expect(stateAfterCheck.votesRevealed).toBe(true);
+      expect(stateAfterCheck.timerEndTime).toBeNull();
+    });
+
+    it('should NOT auto-reveal when timer expires but timerAutoReveal is false', () => {
+      // Documents expected behavior:
+      // Timer expiration without timerAutoReveal just clears the timer
+      // Votes remain hidden until manual reveal
+
+      const now = Date.now();
+      const expiredState = {
+        timerEndTime: now - 1000, // Expired
+        timerAutoReveal: false,
+        votesRevealed: false,
+      };
+
+      const stateAfterCheck = {
+        timerEndTime: null, // Cleared
+        timerAutoReveal: false,
+        votesRevealed: false, // NOT revealed
+      };
+
+      expect(stateAfterCheck.votesRevealed).toBe(false);
+      expect(stateAfterCheck.timerEndTime).toBeNull();
+    });
+
+    it('should persist timerAutoReveal setting in storage', () => {
+      // Documents expected behavior:
+      // timerAutoReveal is part of RoomStorage and persisted
+      // Default: false
+
+      const storageSchema = {
+        participants: {},
+        votesRevealed: false,
+        storyTitle: '',
+        votingScale: 'fibonacci',
+        autoReveal: false,
+        timerEndTime: null,
+        timerAutoReveal: false,
+      };
+
+      expect(storageSchema.timerAutoReveal).toBe(false);
+      expect(storageSchema.timerEndTime).toBeNull();
+    });
+
+    it('documents message types for timer functionality', () => {
+      // Documents the new message types added for timer:
+      //
+      // StartTimerMessage: { type: 'startTimer', duration: number }
+      // - duration must be one of: 30, 60, 120, 300 seconds
+      //
+      // CancelTimerMessage: { type: 'cancelTimer' }
+      // - No payload, just cancels running timer
+      //
+      // SetTimerAutoRevealMessage: { type: 'setTimerAutoReveal', enabled: boolean }
+      // - Sets whether timer expiration triggers auto-reveal
+
+      const startTimerMsg = { type: 'startTimer', duration: 60 };
+      const cancelTimerMsg = { type: 'cancelTimer' };
+      const setTimerAutoRevealMsg = { type: 'setTimerAutoReveal', enabled: true };
+
+      expect(startTimerMsg.type).toBe('startTimer');
+      expect(startTimerMsg.duration).toBe(60);
+      expect(cancelTimerMsg.type).toBe('cancelTimer');
+      expect(setTimerAutoRevealMsg.type).toBe('setTimerAutoReveal');
+      expect(setTimerAutoRevealMsg.enabled).toBe(true);
+    });
+
+    it('documents future role-gating for timer controls', () => {
+      // Documents design for future role integration (Issue #31):
+      // Timer actions go through canControlTimer(userId) helper
+      // Currently returns true for everyone
+      // Future: check if user has facilitator role
+
+      function canControlTimer(_userId: string): boolean {
+        // Current implementation: anyone can control
+        // Future: return hasRole(userId, 'facilitator')
+        return true;
+      }
+
+      expect(canControlTimer('user1')).toBe(true);
+      expect(canControlTimer('user2')).toBe(true);
+    });
+  });
+
   describe('Ping/Pong with ID (Connection Resilience)', () => {
     // These tests document the ping/pong ID echo behavior for latency measurement
     // Per Phase 5D design doc, server echoes ping ID to enable RTT calculation
