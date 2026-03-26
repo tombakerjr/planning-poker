@@ -27,7 +27,7 @@
   "dependencies": {
     "@vueuse/core": "^13.4.0",
     "nanoid": "^5.1.5",
-    "nuxt": "^3.17.5",
+    "nuxt": "^3.19.0",
     "vue": "^3.5.17",
     "vue-router": "^4.5.1"
   },
@@ -43,7 +43,7 @@
     "eslint": "^9.39.1",
     "eslint-plugin-perfectionist": "^4.15.1",
     "eslint-plugin-vue": "^10.6.1",
-    "h3": "^1.15.3",
+    "h3": "^1.15.9",
     "happy-dom": "^20.0.5",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
@@ -54,7 +54,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0",
     "vitest": "^3.2.4",
-    "wrangler": "^4.50.0"
+    "wrangler": "^4.59.1"
   },
   "packageManager": "pnpm@10.19.0+sha512.c9fc7236e92adf5c8af42fd5bf1612df99c2ceb62f27047032f4720b33f8eacdde311865e91c411f2774f618d82f320808ecb51718bfa82c060c4ba7c76a32b8"
 }
