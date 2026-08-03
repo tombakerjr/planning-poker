@@ -1,0 +1,58 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      production:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@types/*"
+          - "typescript"
+          - "typescript-eslint"
+          - "eslint*"
+          - "@stylistic/*"
+          - "vitest"
+          - "@vitest/*"
+          - "@cloudflare/vitest-pool-workers"
+          - "@vue/test-utils"
+          - "happy-dom"
+          - "playwright"
+          - "@playwright/test"
+          - "wrangler"
+          - "husky"
+          - "lint-staged"
+        update-types:
+          - "minor"
+          - "patch"
+      dev-tools:
+        patterns:
+          - "@types/*"
+          - "typescript"
+          - "typescript-eslint"
+          - "eslint*"
+          - "@stylistic/*"
+          - "vitest"
+          - "@vitest/*"
+          - "@cloudflare/vitest-pool-workers"
+          - "@vue/test-utils"
+          - "happy-dom"
+          - "playwright"
+          - "@playwright/test"
+          - "wrangler"
+          - "husky"
+          - "lint-staged"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"

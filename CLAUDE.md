@@ -189,11 +189,14 @@ The `usePokerRoom` composable handles:
 
 ### ⚠️ IMPORTANT: Branch Protection Rules
 
-**Branch protection is enabled on `main`:**
+`main` is protected by a repository **ruleset** (not classic branch protection).
+What it actually enforces:
+
 - ✅ Pull requests are REQUIRED for all changes
 - ❌ Direct pushes to `main` are BLOCKED
-- ✅ All automated checks must pass before merging
-- ✅ Human review required before merge
+- ✅ Required status checks must pass: `Workers Builds: planning-poker` and `claude-review`
+- ✅ Squash is the only permitted merge method
+- ⚠️ **Approving reviews are NOT required** (`required_approving_review_count: 0`)
 
 **This applies to ALL Claude Code sessions:**
 - Local development
@@ -205,6 +208,10 @@ The `usePokerRoom` composable handles:
 - Commit directly to `main`
 - Push to `main` without a PR
 - Merge without passing checks
+
+**Exception — Dependabot:** `.github/workflows/dependabot-auto-merge.yml` enables
+auto-merge on Dependabot patch/minor PRs. The required checks above still gate every
+one of them; only the human step is skipped. Major bumps always wait for a person.
 
 ### Standard GitHub Issue Workflow
 
