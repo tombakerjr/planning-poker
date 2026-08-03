@@ -50,6 +50,11 @@ jobs:
             - Breaking changes
             - Adherence to CLAUDE.md conventions
 
+            **Do not read lockfiles** (`pnpm-lock.yaml`, `package-lock.json`). They are
+            generated, frequently thousands of lines, and reading them exhausts the turn
+            budget before the review finishes. Dependency changes are described in the PR
+            body — review those claims, not the lockfile.
+
             **Communication style:**
             - Prefer brevity: bullet points, direct feedback
             - Verbose explanations are acceptable when necessary for clarity or complex issues
@@ -61,7 +66,7 @@ jobs:
             Post your review as a comment on the PR using `gh pr comment`.
 
           claude_args: |
-            --max-turns 25
+            --max-turns 40
             --allowedTools Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)
 
   # Experimental: Concise review format for comparison
@@ -94,6 +99,10 @@ jobs:
 
             Review this PR for actionable issues only. Read CLAUDE.md and .serena/memories/ for context.
 
+            **Do not read lockfiles** (`pnpm-lock.yaml`, `package-lock.json`) — generated,
+            huge, and they exhaust the turn budget. Dependency changes are described in the
+            PR body.
+
             **What to report:**
             - 🔴 CRITICAL: Security vulnerabilities, data loss bugs, crashes
             - 🟡 FIX: Bugs, logic errors, missing error handling
@@ -122,6 +131,6 @@ jobs:
             Post via `gh pr comment`. Prefix with "**[Concise Review]**"
 
           claude_args: |
-            --max-turns 30
+            --max-turns 40
             --allowedTools Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)
 
